@@ -1,0 +1,29 @@
+name: "orderlens"
+version: "1.0.0"
+config-version: 2
+
+profile: "orderlens"
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  orderlens:
+    staging:
+      # Views: staging is a thin typed/renamed pass over raw. Materialising it
+      # would double storage for no query-time benefit, since marts are tables.
+      +materialized: view
+      +schema: staging
+    marts:
+      # Tables: marts are queried repeatedly by Tableau and by the analysis
+      # scripts. On free-tier Postgres, re-running the joins per dashboard
+      # interaction is the difference between snappy and unusable (NFR-4).
+      +materialized: table
+      +schema: marts

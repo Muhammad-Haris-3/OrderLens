@@ -1,0 +1,18 @@
+# Copy to ~/.dbt/profiles.yml, or keep here and run dbt with
+#   dbt run --profiles-dir .
+# Values come from environment variables so no credential is ever committed.
+
+orderlens:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DBT_HOST') }}"
+      user: "{{ env_var('DBT_USER') }}"
+      password: "{{ env_var('DBT_PASSWORD') }}"
+      port: "{{ env_var('DBT_PORT') | int }}"
+      dbname: "{{ env_var('DBT_DBNAME') }}"
+      schema: "{{ env_var('DBT_SCHEMA') }}"
+      sslmode: require
+      threads: 4
+      keepalives_idle: 0

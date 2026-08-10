@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.local
+venv/
+__pycache__/
+*.pyc
+
+# Raw data — not committed (see data/raw/README.md for how to obtain it)
+data/raw/*.csv
+
+# dbt
+dbt_orderlens/target/
+dbt_orderlens/dbt_packages/
+dbt_orderlens/logs/
+.user.yml
+
+# Analysis artefacts
+.ipynb_checkpoints/
+analysis/output/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,102 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Untransformed landing zone for the nine Olist source CSVs. Every column is
+      text by design — see sql/raw_schema.sql for why. Tests declared here encode
+      what we *expect* to be true of the source; M2 (data-quality audit) exists to
+      find out where that expectation is wrong.
+    schema: raw
+
+    tables:
+      - name: orders
+        description: One row per order placed on the marketplace.
+        columns:
+          - name: order_id
+            description: Primary key of an order.
+            tests: [unique, not_null]
+          - name: customer_id
+            description: >
+              Per-ORDER customer key, not a person. Joining retention analysis on
+              this makes every customer look like a first-time buyer. Use
+              customers.customer_unique_id instead. See SRS risk R-1.
+            tests: [not_null]
+          - name: order_status
+            description: delivered, shipped, canceled, unavailable, invoiced, processing, created, approved.
+            tests: [not_null]
+          - name: order_delivered_customer_date
+            description: >
+              Null for orders not yet delivered — expected, not an error. Delivery
+              analysis must filter on status = 'delivered' rather than assume this
+              is populated.
+
+      - name: order_items
+        description: One row per item within an order. Grain is (order_id, order_item_id).
+        columns:
+          - name: order_id
+            tests: [not_null]
+          - name: order_item_id
+            description: Sequence number within the order — NOT globally unique.
+            tests: [not_null]
+          - name: price
+            tests: [not_null]
+
+      - name: order_payments
+        description: One row per payment instrument used on an order; an order may split across several.
+        columns:
+          - name: order_id
+            tests: [not_null]
+          - name: payment_type
+            tests: [not_null]
+
+      - name: order_reviews
+        description: >
+          One review per order. review_id is NOT reliably unique in the source —
+          deliberately untested here so M2 can quantify the duplication rather
+          than fail the build on a known source defect.
+        columns:
+          - name: order_id
+            tests: [not_null]
+          - name: review_score
+            description: Ordinal 1-5. Heavily skewed toward 5 — mean alone misleads.
+            tests: [not_null]
+
+      - name: customers
+        description: One row per customer_id (i.e. per order), mapping to a person via customer_unique_id.
+        columns:
+          - name: customer_id
+            tests: [unique, not_null]
+          - name: customer_unique_id
+            description: The actual person. The correct key for retention and RFM.
+            tests: [not_null]
+
+      - name: sellers
+        description: One row per seller.
+        columns:
+          - name: seller_id
+            tests: [unique, not_null]
+
+      - name: products
+        description: One row per product.
+        columns:
+          - name: product_id
+            tests: [unique, not_null]
+          - name: product_category_name
+            description: Portuguese; join product_category_translation for English.
+
+      - name: product_category_translation
+        description: Portuguese to English category names.
+        columns:
+          - name: product_category_name
+            tests: [unique, not_null]
+
+      - name: geolocation
+        description: >
+          Lat/lng points by ZIP prefix. MANY rows per prefix — joining this
+          directly to a fact table fans out rows and inflates revenue. Must be
+          aggregated to one row per prefix first. See SRS risk R-2.
+        columns:
+          - name: geolocation_zip_code_prefix
+            description: Intentionally NOT tested for uniqueness — it is genuinely not unique.
+            tests: [not_null]
