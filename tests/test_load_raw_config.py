@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from scripts.load_raw import TABLES
+from scripts.load_raw import TABLES, read_header
 
 RAW_SCHEMA = Path(__file__).resolve().parent.parent / "sql" / "raw_schema.sql"
 
@@ -77,3 +77,22 @@ def test_customer_unique_id_is_present_in_customers_header():
     # Risk R-1: retention analysis is impossible without this column landing.
     _, header = TABLES["olist_customers_dataset.csv"]
     assert "customer_unique_id" in header
+
+
+def test_read_header_strips_utf8_bom(tmp_path):
+    """Regression: product_category_name_translation.csv ships with a BOM.
+
+    Read as plain utf-8 its first column is "﻿product_category_name", which
+    matches nothing and breaks every join against the category translation.
+    """
+    csv_file = tmp_path / "bom.csv"
+    csv_file.write_bytes(b"\xef\xbb\xbfcol_a,col_b\n1,2\n")
+
+    assert read_header(csv_file) == ("col_a", "col_b")
+
+
+def test_read_header_unaffected_when_no_bom(tmp_path):
+    csv_file = tmp_path / "plain.csv"
+    csv_file.write_bytes(b"col_a,col_b\n1,2\n")
+
+    assert read_header(csv_file) == ("col_a", "col_b")

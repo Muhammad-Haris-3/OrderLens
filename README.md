@@ -118,7 +118,7 @@ table. dbt data-quality tests join the suite at M3.
 | # | Milestone | Delivers | Status |
 |---|---|---|---|
 | M0 | Foundation — repo, warehouse DDL, loader, CI, data dictionary | Reproducible skeleton | ✅ [Summary](OrderLens_M0_Summary.md) |
-| M1 | Ingestion — raw layer loaded, row counts reconciled | FR-1 | ⬜ |
+| M1 | Ingestion — raw layer loaded, row counts reconciled | FR-1 | ✅ [Summary](OrderLens_M1_Summary.md) |
 | M2 | Data-quality audit — anomalies found and adjudicated | FR-4 | ⬜ |
 | M3 | Dimensional model — staging + marts, tests green | FR-2, FR-3 | ⬜ |
 | M4 | Descriptive — delivery, cohorts, RFM, revenue concentration | FR-5–8 | ⬜ |

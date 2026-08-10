@@ -26,6 +26,12 @@ from dotenv import load_dotenv
 
 RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
 
+# utf-8-sig, not utf-8: product_category_name_translation.csv ships with a UTF-8
+# BOM. Read as plain utf-8, its first column name becomes "﻿product_category_name",
+# which silently fails every join against it. utf-8-sig strips a BOM when present
+# and is a no-op when absent, so it is safe for all nine files.
+ENCODING = "utf-8-sig"
+
 # source CSV -> (raw table, expected header)
 TABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "olist_orders_dataset.csv": (
@@ -84,14 +90,14 @@ def count_data_rows(path: Path) -> int:
     A plain line count would be wrong: review comments contain embedded
     newlines inside quoted fields.
     """
-    with path.open(newline="", encoding="utf-8") as fh:
+    with path.open(newline="", encoding=ENCODING) as fh:
         reader = csv.reader(fh)
         next(reader, None)  # header
         return sum(1 for _ in reader)
 
 
 def read_header(path: Path) -> tuple[str, ...]:
-    with path.open(newline="", encoding="utf-8") as fh:
+    with path.open(newline="", encoding=ENCODING) as fh:
         return tuple(next(csv.reader(fh), []))
 
 
@@ -118,7 +124,7 @@ def load_table(cur, path: Path, table: str) -> tuple[int, int]:
     rows_in_file = count_data_rows(path)
 
     cur.execute(f"TRUNCATE {table}")
-    with path.open("r", newline="", encoding="utf-8") as fh:
+    with path.open("r", newline="", encoding=ENCODING) as fh:
         cur.copy_expert(
             f"COPY {table} FROM STDIN WITH (FORMAT csv, HEADER true)", fh
         )
