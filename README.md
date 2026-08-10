@@ -135,11 +135,3 @@ table. dbt data-quality tests join the suite at M3.
 | [SRS v1.0](OrderLens_SRS_v1.0.md) | Requirements, feasibility, architecture decisions, analysis plan, risks |
 | [Data Dictionary](docs/data_dictionary.md) | Source fields and — more importantly — every derived measure's formula |
 
----
-
-## Companion project
-
-[**InsightForge**](https://insight-forge-beta.vercel.app) — an analytics
-*product* (upload a CSV, get automated profiling, EDA, testing and modelling).
-OrderLens is the analytics *engagement*: one dataset, interrogated properly,
-ending in a recommendation. Different muscle, deliberately.

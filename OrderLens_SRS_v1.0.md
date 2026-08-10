@@ -120,8 +120,7 @@ rather than buried. Requirement **FR-12** makes this a hard deliverable.
 
 ## 4. SDLC methodology
 
-**Iterative and incremental**, solo-adapted — the same methodology used
-successfully on the InsightForge project.
+**Iterative and incremental**, solo-adapted.
 
 Each milestone is independently demonstrable and produces a committed artefact.
 Analysis milestones additionally require that **every published number is
@@ -393,5 +392,4 @@ The project is complete when:
 | Version | 1.0 |
 | Status | Approved for M0 |
 | Author | Muhammad Haris Khokhar |
-| Companion project | InsightForge — analytics *product*; OrderLens is the analytics *engagement* |
 | Next document | `OrderLens_Design_Phase_v1.0.md` |
