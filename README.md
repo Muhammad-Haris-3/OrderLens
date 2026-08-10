@@ -130,8 +130,24 @@ table. dbt data-quality tests join the suite at M3.
 
 ## Documentation
 
+Everything is documented as it's built — what was decided, why, and what broke
+along the way.
+
+### Specification and design
+
 | Document | Contents |
 |---|---|
-| [SRS v1.0](OrderLens_SRS_v1.0.md) | Requirements, feasibility, architecture decisions, analysis plan, risks |
-| [Data Dictionary](docs/data_dictionary.md) | Source fields and — more importantly — every derived measure's formula |
+| [SRS v1.0](OrderLens_SRS_v1.0.md) | 21 functional + 8 non-functional requirements, feasibility study, architecture decisions with rejected alternatives, analysis plan, 7 risks |
+| [Design Phase v1.0](OrderLens_Design_Phase_v1.0.md) | Every model, its grain, its tests, and why it's shaped that way — layer architecture, star schema, test strategy, leakage rules |
+| [Data Dictionary](docs/data_dictionary.md) | Source fields, and every derived measure's exact formula |
+
+### Milestone record
+
+Each summary documents what was built, how it was verified, and the problems
+found — including the ones that were caught before they did damage.
+
+| # | Milestone | Notable finding |
+|---|---|---|
+| [M0](OrderLens_M0_Summary.md) | Foundation | Two dataset traps documented as risks *before* being hit |
+| [M1](OrderLens_M1_Summary.md) | Ingestion | A UTF-8 BOM that would have silently broken every category join |
 
