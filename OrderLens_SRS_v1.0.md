@@ -400,13 +400,24 @@ broke, and what was decided.
 
 The project is complete when:
 
-1. A clean clone rebuilds the warehouse via documented commands (NFR-1).
-2. All dbt and Python tests pass in CI (NFR-3).
-3. Every FR marked *Must* is delivered and traceable.
-4. The dashboard is publicly reachable by URL.
-5. The decision memo states a recommendation, its cost, its projected return, and
-   its confidence — and is intelligible to a non-technical reader.
-6. The limitations statement is present and honest.
+1. ✅ A clean clone rebuilds the warehouse via documented commands (NFR-1).
+2. ✅ All dbt and Python tests pass in CI (NFR-3) — see §8.1.
+3. ✅ Every FR marked *Must* is delivered and traceable.
+4. ✅ The dashboard is publicly reachable by URL —
+   [public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)
+5. ✅ The decision memo states a recommendation, its cost, its projected return,
+   and its confidence — and is intelligible to a non-technical reader.
+6. ✅ The limitations statement is present and honest.
+
+**All six met.** The project is complete.
+
+One correction is recorded rather than absorbed: §9.2 chose Postgres over DuckDB
+partly because "a dashboard cannot connect to" a file-local database. That
+reasoning was faulty — Tableau *Public*, the free edition this project is
+constrained to by NFR-7, cannot connect to Postgres either. The warehouse choice
+was right for other reasons (persistence, SQL depth, the M2 audit), but it was
+justified in part by a premise that turned out to be false, and the dashboard is
+fed by a file extract. See `docs/dashboard_spec.md` §1.
 
 ---
 

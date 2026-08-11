@@ -1,7 +1,7 @@
 # OrderLens — M7 (Communication) Milestone Summary
 
 **Date:** 2026-08-11
-**Status:** Complete, with one item open — see §8
+**Status:** Complete
 **Maps to:** SRS FR-18 (dashboard), FR-19 (decision memo), FR-20 (A/B design),
 FR-21 (quantified in currency)
 
@@ -178,7 +178,19 @@ the problem and is sized that way throughout.
 
 ---
 
-## 8. FR-18 — specified and data-ready, not published
+## 8. FR-18 — published
+
+**[public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)**
+
+Four panels in reading order: delivery performance over time (both failure spikes
+carrier-side), the cost of a breach by delay band (the cliff), states plotted by
+revenue against failure rate (RJ high on both), and the geography. Every state on
+the map carries its late rate as a printed label, so the meaning is not left to
+colour alone (NFR-6).
+
+The build encountered exactly the problem §1 of the spec now documents — Tableau
+Public cannot connect to Postgres — and the dashboard is fed by the CSV extract
+`scripts/export_dashboard_data.py` produces.
 
 The dashboard is fully specified in
 [`docs/dashboard_spec.md`](docs/dashboard_spec.md): three views, every chart's
@@ -254,13 +266,12 @@ project caught a regression rather than documenting one.
 |---|---|---|
 | 1 | A clean clone rebuilds the warehouse via documented commands | ✅ |
 | 2 | All dbt and Python tests pass in CI | ✅ since the NFR-3 work |
-| 3 | Every *Must* FR delivered and traceable | ⬜ **20 of 21** — FR-18 pending publication |
-| 4 | The dashboard is publicly reachable by URL | ⬜ **open** — needs a Tableau Public account |
+| 3 | Every *Must* FR delivered and traceable | ✅ **21 of 21** |
+| 4 | The dashboard is publicly reachable by URL | ✅ [published](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1) |
 | 5 | The memo states a recommendation, its cost, its return and its confidence, and is intelligible to a non-technical reader | ✅ |
 | 6 | The limitations statement is present and honest | ✅ |
 
-**Four of six closed, one closed except for a manual publish step, and one open
-on it.** The analysis is complete; what remains is an account login.
+**All six met. The project is complete.**
 
 ---
 

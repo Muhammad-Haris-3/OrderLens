@@ -1,7 +1,7 @@
 # Dashboard build specification (FR-18)
 
-**Status:** specified and data-ready. **Publishing requires a Tableau Public
-account and its desktop client**, so the final step is manual — see §6.
+**Status:** ✅ **Published** —
+[public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)
 
 **Satisfies:** FR-18 (public interactive dashboard covering delivery performance,
 satisfaction and segment drill-down) and NFR-6 (colourblind-safe, no meaning
@@ -209,9 +209,13 @@ file here is 96,470 rows and 17 MB, so there is no issue — but do not add
 `fct_order_items` (112,650 rows) without a reason, and do not export the raw
 layer at all.
 
-**Until that URL exists, FR-18 is specified and data-ready but not delivered**,
-and acceptance criterion §14.4 ("the dashboard is publicly reachable by URL")
-remains open. Recorded as open rather than quietly marked complete.
+**Done** —
+[public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1),
+closing acceptance criterion §14.4.
+
+**Refreshing it** is `python scripts/export_dashboard_data.py`, then re-open the
+workbook and **File → Save to Tableau Public**. The published dashboard is a
+snapshot, so the `exported_at` caption is what tells a viewer how old it is.
 
 **One caution before publishing.** Tableau Public makes both the workbook and its
 data public (SRS risk R-7). That is acceptable here — the dataset is already

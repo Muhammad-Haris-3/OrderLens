@@ -10,13 +10,14 @@ recommendation a business could act on.
 **The deliverable is a decision, not an app.** The pipeline exists to make that
 decision trustworthy and reproducible.
 
-> ✅ **Analysis complete — all seven milestones.** One manual step outstanding:
-> publishing the dashboard needs a Tableau Public account (FR-18, see
-> [spec](docs/dashboard_spec.md)).
+> ✅ **Complete — all seven milestones, all 21 requirements delivered.**
 >
 > **The finding:** customers do not punish slow delivery. They punish **broken
 > promises**. Orders that take the *same* time to arrive score a full point lower
-> when they miss the quoted date. → **[Read the decision memo](docs/decision_memo.md)**
+> when they miss the quoted date.
+>
+> 📊 **[Live dashboard](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)**
+> · 📄 **[Decision memo](docs/decision_memo.md)** (2 pages, no technical background needed)
 
 ---
 
@@ -40,6 +41,7 @@ time*, so this addresses about a third of the problem; and with a 2.24% repeat
 rate, the case cannot rest on retention.
 
 → **[The decision memo](docs/decision_memo.md)** (2 pages, no technical background needed)
+→ **[The dashboard](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)** (Tableau Public — delivery performance, impact, and where to fix it first)
 
 ---
 
@@ -316,6 +318,7 @@ along the way.
 | **[Decision Memo](docs/decision_memo.md)** | **Two pages, plain language — the deliverable this project exists to produce** |
 | [Decision Results](docs/decision_results.md) | Generated evidence: mechanism test, policy simulation, break-even, A/B power |
 | [Dashboard Spec](docs/dashboard_spec.md) | Three views, fields, colourblind-safe encodings, and what the dashboard must not imply |
+| **[Live Dashboard](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)** | **Published on Tableau Public** |
 
 Model-level documentation lives with the models:
 [staging](dbt_orderlens/models/staging/_staging_models.yml),
