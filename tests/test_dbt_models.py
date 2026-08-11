@@ -62,6 +62,8 @@ EXPECTED_MARTS = {
     # Analysis marts (M4) — aggregation lives in SQL, not in a notebook cell
     "mart_delivery_monthly", "mart_delay_buckets", "mart_cohort_retention",
     "mart_customer_rfm", "mart_revenue_concentration",
+    # Modelling table (M5/M6)
+    "mart_order_analysis",
 }
 
 

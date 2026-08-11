@@ -327,3 +327,65 @@ models:
         tests: [not_null]
       - name: cumulative_pct_of_revenue
         tests: [not_null]
+
+  - name: mart_order_analysis
+    description: >
+      The modelling table for M5 and M6. One row per delivery-eligible order —
+      96,470 rows, 95,824 of them carrying a review.
+
+      FR-11 requires the delay effect to be estimated controlling for price,
+      freight, category, seller state, customer state and season, and none of
+      those live on fct_orders. Design Phase §8: a missing control is a new mart
+      column, not an ad-hoc join in a script.
+
+      PRIMARY ITEM ATTRIBUTION — category, seller and product attributes come
+      from the highest-priced item in the order, tie-broken on product_id. That
+      is a choice, not a fact; is_single_seller and product_count are carried so
+      any analysis can restrict to the unambiguous cases.
+
+      M6 LEAKAGE — the columns marked post-delivery below may NOT be used by the
+      classifier. Everything else is known at purchase time.
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+      - name: customer_unique_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_customers')
+              field: customer_unique_id
+      - name: review_score
+        description: "Outcome. Null on 646 orders that were never reviewed."
+      - name: delay_days
+        description: "POST-DELIVERY — treatment, off-limits to M6."
+        tests: [not_null]
+      - name: is_late
+        description: "POST-DELIVERY — off-limits to M6."
+        tests: [not_null]
+      - name: delivery_days
+        description: "POST-DELIVERY — off-limits to M6."
+      - name: seller_handover_days
+        description: "POST-DELIVERY — off-limits to M6."
+      - name: carrier_transit_days
+        description: "POST-DELIVERY — off-limits to M6."
+      - name: estimated_days
+        description: "Known at purchase — the promise shown to the customer."
+        tests: [not_null]
+      - name: distance_km
+        description: >
+          Great-circle km between customer and seller centroids. Null on 475
+          orders whose ZIP prefix has no centroid (M2 F-07); the regression drops
+          those rows and reports how many.
+      - name: primary_category
+        tests: [not_null]
+      - name: seller_state
+        tests: [not_null]
+      - name: customer_state
+        tests: [not_null]
+      - name: season
+        description: Southern hemisphere. Getting this backwards would invert every seasonal coefficient.
+        tests:
+          - not_null
+          - accepted_values: {values: [summer, autumn, winter, spring]}
+      - name: order_item_total
+        tests: [not_null]
