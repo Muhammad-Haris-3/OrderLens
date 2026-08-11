@@ -4,9 +4,13 @@ sources:
   - name: raw
     description: >
       Untransformed landing zone for the nine Olist source CSVs. Every column is
-      text by design — see sql/raw_schema.sql for why. Tests declared here encode
-      what we *expect* to be true of the source; M2 (data-quality audit) exists to
-      find out where that expectation is wrong.
+      text by design — see sql/raw_schema.sql for why.
+
+      Tests here originally encoded what we *expected* to be true. M2 (the
+      data-quality audit) measured it: see docs/data_quality_audit.md. Where an
+      expectation turned out to be wrong, the test is gone and the measured
+      number is recorded in its place — a test that fails on a known, permanent
+      property of the source is one everybody learns to ignore.
     schema: raw
 
     tables:
@@ -23,16 +27,43 @@ sources:
               customers.customer_unique_id instead. See SRS risk R-1.
             tests: [not_null]
           - name: order_status
-            description: delivered, shipped, canceled, unavailable, invoiced, processing, created, approved.
-            tests: [not_null]
+            description: >
+              M2 (A-06) measured all eight: delivered 96,478 (97.02%), shipped 1,107,
+              canceled 625, unavailable 609, invoiced 314, processing 301, created 5,
+              approved 2.
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [delivered, shipped, canceled, unavailable, invoiced,
+                           processing, created, approved]
           - name: order_delivered_customer_date
             description: >
-              Null for orders not yet delivered — expected, not an error. Delivery
-              analysis must filter on status = 'delivered' rather than assume this
-              is populated.
+              Null on 2,965 orders (2.98%) — expected, not an error: an undelivered
+              order has no delivery timestamp (A-08 cross-referenced with A-06).
+
+              Delivery analysis needs BOTH conditions, not either (M2 finding F-03):
+              status = 'delivered' AND this column is not null. Status alone admits
+              8 orders with no delivery timestamp; this column alone admits 6 orders
+              that were delivered and then cancelled.
+          - name: order_estimated_delivery_date
+            description: >
+              A DATE stored at midnight — all 96,470 delivered orders, no exceptions
+              (A-10). No delivery is recorded at exactly midnight, so comparing this
+              against the delivery TIMESTAMP calls every on-the-promised-day arrival
+              late. delay_days is therefore computed on calendar dates. See M2
+              finding F-01 — the timestamp form understates the project's central
+              estimate by 14.4%.
+            tests: [not_null]
 
       - name: order_items
-        description: One row per item within an order. Grain is (order_id, order_item_id).
+        description: >
+          One row per item within an order. Grain is (order_id, order_item_id), and it
+          holds exactly — 112,650 rows, zero excess (A-02).
+
+          775 orders have NO row here at all (A-14, A-15): 603 unavailable, 164
+          canceled. They are a real business state, not corruption — every one has a
+          payment and 756 have a review. fct_orders joins this with a LEFT JOIN and
+          leaves order_value NULL rather than 0. See M2 finding F-04 / decision D-4.
         columns:
           - name: order_id
             tests: [not_null]
@@ -40,27 +71,77 @@ sources:
             description: Sequence number within the order — NOT globally unique.
             tests: [not_null]
           - name: price
+            description: >
+              R$0.85 to R$6,735.00, median R$74.99. No zero or negative prices anywhere
+              (A-23).
+            tests: [not_null]
+          - name: freight_value
+            description: >
+              Zero on 383 items across 339 orders (A-23) — free shipping is a promotion,
+              not an error. freight_ratio guards the division with nullif.
+            tests: [not_null]
+          - name: seller_id
+            description: >
+              1,278 orders (1.3%) contain items from more than one seller (A-29), so an
+              order-level delivery outcome cannot be attributed to a single seller.
+              Seller ranking in BQ-4 uses single-seller orders only. See F-12.
             tests: [not_null]
 
       - name: order_payments
-        description: One row per payment instrument used on an order; an order may split across several.
+        description: >
+          One row per payment instrument used on an order; an order may split across
+          several. Grain (order_id, payment_sequential) holds exactly — 103,886 rows,
+          zero excess (A-02).
+
+          NOT the source of order_value. M2 (A-24) measured payments exceeding item
+          totals on 264 orders and falling short on 39 — a 6.8:1 asymmetry that is
+          the signature of installment interest. Revenue comes from order_items.
         columns:
           - name: order_id
             tests: [not_null]
           - name: payment_type
-            tests: [not_null]
+            description: >
+              not_defined is a real source value on 3 zero-value rows and is admitted
+              deliberately (A-25). Excluding it would fail the build on a known,
+              harmless property of the source.
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [credit_card, boleto, voucher, debit_card, not_defined]
 
       - name: order_reviews
         description: >
-          One review per order. review_id is NOT reliably unique in the source —
-          deliberately untested here so M2 can quantify the duplication rather
-          than fail the build on a known source defect.
+          NOT one review per order — M2 (A-03, A-04) disproved it. 99,224 rows carry
+          98,410 distinct review_ids and 98,673 distinct order_ids.
+
+          The two failures are different things. 789 review_ids appear against
+          several DIFFERENT orders, always agreeing on the score — one survey
+          covering a basket, not a duplicated row. 547 orders carry several reviews
+          and 202 of those disagree on the score — that is the real grain violation.
+
+          stg_order_reviews deduplicates to one row per order_id, keeping the latest
+          by review_answer_timestamp. See M2 finding F-02 / decision D-1.
         columns:
+          - name: review_id
+            description: >
+              NOT unique — 814 excess rows (A-02), and deliberately untested here and
+              downstream. It is genuinely not unique and never will be; a permanently
+              failing test is one everybody learns to ignore.
+            tests: [not_null]
           - name: order_id
+            description: >
+              Not unique in the source (551 excess rows). Uniqueness is tested on
+              stg_order_reviews AFTER deduplication, where it asserts something true.
             tests: [not_null]
           - name: review_score
-            description: Ordinal 1-5. Heavily skewed toward 5 — mean alone misleads.
-            tests: [not_null]
+            description: >
+              Ordinal 1-5, bimodal not central: 57.78% are 5, 11.51% are 1, the middle
+              is thin (A-28). Mean alone misleads, which is why M5 uses rank-based
+              tests rather than a t-test.
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['1', '2', '3', '4', '5']
 
       - name: customers
         description: One row per customer_id (i.e. per order), mapping to a person via customer_unique_id.
@@ -68,7 +149,19 @@ sources:
           - name: customer_id
             tests: [unique, not_null]
           - name: customer_unique_id
-            description: The actual person. The correct key for retention and RFM.
+            description: >
+              The actual person. The correct key for retention and RFM. 99,441
+              customer_id values collapse to 96,096 people; 2,997 of them placed more
+              than one order, one of them 17 (A-19). Keying retention on customer_id
+              reports a 100% first-time customer base — a wrong answer that passes
+              every schema test. See SRS risk R-1.
+            tests: [not_null]
+          - name: customer_zip_code_prefix
+            description: >
+              157 distinct prefixes (278 customers) have no row in geolocation at all
+              (A-21). The geography join is therefore a LEFT JOIN — an inner join
+              removes those customers from the fact table and every geographic total
+              under-reports with nothing failing.
             tests: [not_null]
 
       - name: sellers
@@ -76,6 +169,9 @@ sources:
         columns:
           - name: seller_id
             tests: [unique, not_null]
+          - name: seller_zip_code_prefix
+            description: 7 sellers have no geolocation row (A-21). LEFT JOIN, as above.
+            tests: [not_null]
 
       - name: products
         description: One row per product.
@@ -83,10 +179,23 @@ sources:
           - name: product_id
             tests: [unique, not_null]
           - name: product_category_name
-            description: Portuguese; join product_category_translation for English.
+            description: >
+              Portuguese; LEFT JOIN product_category_translation for English, never
+              INNER. 610 products have no category and 13 carry a category absent from
+              the 71-row lookup (A-16). An inner join silently deletes R$185,049.76 of
+              item revenue across 1,473 orders (A-17) and leaves a category report that
+              looks perfectly clean. See M2 finding F-05 / decision D-3.
+          - name: product_weight_g
+            description: >
+              Missing on 2 products and recorded as 0 on 4 more (A-26). Zero is set to
+              null in stg_products — a product does not weigh nothing, and a zero would
+              corrupt any density feature derived from it.
 
       - name: product_category_translation
-        description: Portuguese to English category names.
+        description: >
+          Portuguese to English category names. 71 rows against 73 categories actually
+          in use (A-16) — pc_gamer and portateis_cozinha_e_preparadores_de_alimentos
+          are genuinely absent. The lookup is incomplete by nature, not by error.
         columns:
           - name: product_category_name
             tests: [unique, not_null]
@@ -96,6 +205,15 @@ sources:
           Lat/lng points by ZIP prefix. MANY rows per prefix — joining this
           directly to a fact table fans out rows and inflates revenue. Must be
           aggregated to one row per prefix first. See SRS risk R-2.
+
+          M2 (A-20) measured the fan-out: 1,000,163 rows across 19,015 prefixes,
+          52.6x on average and up to 1,146 rows for a single prefix. 8,556 prefixes
+          (45%) carry more than one spelling of their own city name, which is why
+          stg_geolocation takes the MODAL city and state rather than an arbitrary one.
+
+          42 points fall outside Brazil's bounding box across 21 prefixes (A-22) and
+          are filtered before averaging — one point in the wrong hemisphere drags a
+          whole prefix off the map.
         columns:
           - name: geolocation_zip_code_prefix
             description: Intentionally NOT tested for uniqueness — it is genuinely not unique.

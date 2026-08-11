@@ -10,8 +10,9 @@ recommendation a business could act on.
 **The deliverable is a decision, not an app.** The pipeline exists to make that
 decision trustworthy and reproducible.
 
-> 🚧 **In progress.** M0 (Foundation) complete. Headline findings land at M5;
-> dashboard and decision memo at M7. See [milestones](#milestones).
+> 🚧 **In progress.** M2 (Data-quality audit) complete — the warehouse is loaded,
+> audited and adjudicated. Headline findings land at M5; dashboard and decision
+> memo at M7. See [milestones](#milestones).
 
 ---
 
@@ -91,25 +92,60 @@ the database. Then create the schema and load:
 ```bash
 psql "$DATABASE_URL" -f sql/raw_schema.sql
 python scripts/load_raw.py
+psql "$DATABASE_URL" -f sql/raw_indexes.sql
 ```
 
 The loader truncates and reloads every table, reconciles file row counts against
 landed row counts, records both in `raw.load_log`, and **fails rather than
-warns** on any mismatch.
+warns** on any mismatch. The indexes are on join keys only — an index asserts
+nothing about the data, so raw keeps its source fidelity while the audit and the
+M3 builds stop scanning a million rows at a time.
+
+---
+
+## The data-quality audit
+
+```bash
+python scripts/run_audit.py          # run all 30 checks, regenerate the evidence
+python scripts/run_audit.py --list   # list the checks; no database needed
+```
+
+Thirty committed queries in [`sql/audit/`](sql/audit) interrogate the raw layer.
+The runner executes them in a **read-only** session — the audit cannot alter what
+it measures — and writes every returned row to
+[`docs/data_quality_audit_results.md`](docs/data_quality_audit_results.md).
+
+The findings are adjudicated in
+[`docs/data_quality_audit.md`](docs/data_quality_audit.md), where every figure
+cites the check that produced it. The most consequential one:
+`order_estimated_delivery_date` is a date stored at midnight while
+`order_delivered_customer_date` is a real timestamp, so the obvious subtraction
+counts **1,292 on-time deliveries as late** — understating the project's central
+estimate by 14%.
 
 ---
 
 ## Testing
 
 ```bash
-pytest -q          # config-integrity tests (no data or DB required)
+pytest -q          # 27 tests — no data or database required
 ruff check .       # lint
 ```
 
-The current suite guards a specific silent failure: if a column is added to
-`sql/raw_schema.sql` but not to the loader's expected header, `COPY` shifts
-every subsequent column by one and lands a fully populated, entirely wrong
-table. dbt data-quality tests join the suite at M3.
+The suite guards specific silent failures rather than exercising code paths:
+
+- **Loader vs DDL drift** — a column added to `sql/raw_schema.sql` but not to the
+  loader's expected header makes `COPY` shift every subsequent column by one and
+  land a fully populated, entirely wrong table.
+- **Audit integrity** — check ids contiguous, filenames matching ids, no audit
+  query containing a write or DDL keyword, every `A-nn` cited in the audit
+  document resolving to a query that exists, all five deferred design decisions
+  covered.
+- **`_sources.yml`** — parses, matches the loader's table list, and its
+  `accepted_values` still match what the audit measured. CI's `dbt parse` step
+  cannot fail until M3 adds models, so these tests fail instead.
+
+dbt data-quality tests join the suite at M3.
 
 ---
 
@@ -119,7 +155,7 @@ table. dbt data-quality tests join the suite at M3.
 |---|---|---|---|
 | M0 | Foundation — repo, warehouse DDL, loader, CI, data dictionary | Reproducible skeleton | ✅ [Summary](OrderLens_M0_Summary.md) |
 | M1 | Ingestion — raw layer loaded, row counts reconciled | FR-1 | ✅ [Summary](OrderLens_M1_Summary.md) |
-| M2 | Data-quality audit — anomalies found and adjudicated | FR-4 | ⬜ |
+| M2 | Data-quality audit — anomalies found and adjudicated | FR-4 | ✅ [Summary](OrderLens_M2_Summary.md) |
 | M3 | Dimensional model — staging + marts, tests green | FR-2, FR-3 | ⬜ |
 | M4 | Descriptive — delivery, cohorts, RFM, revenue concentration | FR-5–8 | ⬜ |
 | M5 | Inferential — effect sizes, controlled regression | FR-9–13 | ⬜ |
@@ -138,8 +174,10 @@ along the way.
 | Document | Contents |
 |---|---|
 | [SRS v1.0](OrderLens_SRS_v1.0.md) | 21 functional + 8 non-functional requirements, feasibility study, architecture decisions with rejected alternatives, analysis plan, 7 risks |
-| [Design Phase v1.0](OrderLens_Design_Phase_v1.0.md) | Every model, its grain, its tests, and why it's shaped that way — layer architecture, star schema, test strategy, leakage rules |
+| [Design Phase v1.1](OrderLens_Design_Phase_v1.0.md) | Every model, its grain, its tests, and why it's shaped that way — layer architecture, star schema, test strategy, leakage rules. Amended by the M2 audit; no open decisions |
 | [Data Dictionary](docs/data_dictionary.md) | Source fields, and every derived measure's exact formula |
+| [Data-Quality Audit](docs/data_quality_audit.md) | 17 findings graded and adjudicated, five deferred design decisions resolved — the M2 deliverable |
+| [Audit Results](docs/data_quality_audit_results.md) | Generated evidence: the exact rows every one of the 30 audit queries returned |
 
 ### Milestone record
 
@@ -150,4 +188,5 @@ found — including the ones that were caught before they did damage.
 |---|---|---|
 | [M0](OrderLens_M0_Summary.md) | Foundation | Two dataset traps documented as risks *before* being hit |
 | [M1](OrderLens_M1_Summary.md) | Ingestion | A UTF-8 BOM that would have silently broken every category join |
+| [M2](OrderLens_M2_Summary.md) | Data-quality audit | A unit mismatch between the delivery promise and the delivery measurement, understating the project's central estimate by 14% |
 

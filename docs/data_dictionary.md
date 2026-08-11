@@ -94,18 +94,44 @@ deliverable traces back to one of these formulas (NFR-2).
 
 | Measure | Formula | Notes |
 |---|---|---|
-| `delivery_days` | `delivered_customer_date − purchase_timestamp` | Total customer-perceived wait |
+| `delivery_days` | `delivered_customer_date − purchase_timestamp` | Total customer-perceived wait. Full timestamp precision |
 | `estimated_days` | `estimated_delivery_date − purchase_timestamp` | The promise |
-| **`delay_days`** | `delivered_customer_date − estimated_delivery_date` | **Signed.** Positive = late, negative = early. The project's central independent variable |
+| **`delay_days`** | **`delivered_customer_date::date − estimated_delivery_date::date`** | **Signed whole days.** Positive = late, negative = early. The project's central independent variable |
 | `is_late` | `delay_days > 0` | |
-| `seller_handover_days` | `delivered_carrier_date − purchase_timestamp` | Isolates seller-controlled time |
-| `carrier_transit_days` | `delivered_customer_date − delivered_carrier_date` | Isolates logistics-controlled time |
+| `seller_handover_days` | `delivered_carrier_date − purchase_timestamp` | Isolates seller-controlled time. **NULL if negative** |
+| `carrier_transit_days` | `delivered_customer_date − delivered_carrier_date` | Isolates logistics-controlled time. **NULL if negative** |
 
 Splitting the wait into **seller handover** vs **carrier transit** is what makes
 the eventual recommendation actionable — "deliveries are late" is not something
 anyone can fix; "sellers in state X take 4 days to hand over" is.
 
-Delivery measures are computed **only** for `order_status = 'delivered'`.
+Delivery measures are computed **only** where
+`order_status = 'delivered' AND delivered_customer_date IS NOT NULL` — both
+conditions. Status alone admits 8 orders with no delivery timestamp; the
+timestamp alone admits 6 orders that were delivered and then cancelled (M2
+finding F-03).
+
+### Why `delay_days` casts to `::date` (M2 finding F-01)
+
+`order_estimated_delivery_date` is a **date**, stored at midnight — all 96,470
+delivered orders, without exception. `delivered_customer_date` is a real
+timestamp, and **no delivery in the dataset was recorded at exactly midnight**.
+
+Subtracting the two as timestamps therefore calls an order late if it arrived at
+any time on the day it was promised. That misclassifies **1,292 orders** whose
+mean review score is 4.03 — they behave like on-time deliveries — into the late
+group, dragging its mean from 2.27 up to 2.57 and **understating the measured
+effect of late delivery by 14.4%**.
+
+The promise was a *day*. The comparison is made at the granularity the promise
+was made at. `delivery_days`, `seller_handover_days` and `carrier_transit_days`
+keep full timestamp precision — they compare a measurement against another
+measurement, so no unit mismatch arises.
+
+`seller_handover_days` and `carrier_transit_days` are **null rather than
+negative**: 165 orders record carrier handover before purchase and 23 record
+delivery before handover (F-08). A clamped zero would assert an instantaneous
+handover; null asserts the timestamps cannot support the measure.
 
 ### Order value
 
@@ -149,7 +175,27 @@ This is why M5 uses rank-based tests rather than a t-test on the mean.
 
 ## Analysis date
 
-Recency is relative to a fixed **analysis date = the maximum
-`order_purchase_timestamp` in the dataset**, not `now()`. The data ends in 2018;
-anchoring to the current date would make every customer maximally stale and
-render RFM meaningless.
+Recency is relative to a fixed **analysis date = 2018-08-31**, not `now()` and
+not the maximum timestamp in the data.
+
+`now()` is wrong for the obvious reason: the data ends in 2018, so anchoring to
+the current date makes every customer maximally stale and renders RFM
+meaningless.
+
+The maximum `order_purchase_timestamp` — 2018-10-17 — is wrong for a subtler
+one. September and October 2018 carry **16 and 4 orders** against ~6,500 a month
+through the rest of 2018, and **none of those 20 orders was ever delivered**:
+they were still in flight when the extract was taken (M2 finding F-06). That
+tail is a truncation artefact, not a collapse in trading. Anchoring to it adds
+47 days of artificial staleness to every customer and leaves the most recent RFM
+segment populated by eight orders.
+
+2018-08-31 is the last day of the last month with full trading coverage. The 20
+orders after it are excluded from RFM and reported as excluded.
+
+**Trend and cohort window: 2017-01 to 2018-08.** 2016 carries 329 orders in
+total — a pilot period whose inclusion in a trend chart shows explosive growth
+that is an artefact of the platform's launch. It is retained in the warehouse
+and excluded from trend analysis, with the exclusion stated on the chart rather
+than in a footnote. **November 2016 has no orders at all**, so `dim_dates` is
+generated as a gapless spine and the gap appears as a visible zero.
