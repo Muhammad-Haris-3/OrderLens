@@ -376,6 +376,12 @@ models:
           Great-circle km between customer and seller centroids. Null on 475
           orders whose ZIP prefix has no centroid (M2 F-07); the regression drops
           those rows and reports how many.
+      - name: delay_bucket
+        description: >
+          POST-DELIVERY. Same bands as mart_delay_buckets, from the same
+          delay_bucket() macro — the M7 dashboard drills from that aggregate into
+          this grain, and a summary that disagrees with its own drill-down is
+          worse than no dashboard. Verified: all eight bands match exactly.
       - name: primary_category
         tests: [not_null]
       - name: seller_state

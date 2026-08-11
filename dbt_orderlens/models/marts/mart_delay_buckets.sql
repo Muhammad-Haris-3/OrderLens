@@ -19,16 +19,7 @@
 with bucketed as (
 
     select
-        case
-            when delay_days <= -15 then '1. 15+ days early'
-            when delay_days <=  -8 then '2. 8-14 days early'
-            when delay_days <=  -1 then '3. 1-7 days early'
-            when delay_days =    0 then '4. on the promised day'
-            when delay_days <=   7 then '5. 1-7 days late'
-            when delay_days <=  14 then '6. 8-14 days late'
-            when delay_days <=  30 then '7. 15-30 days late'
-            else                        '8. more than 30 days late'
-        end                                                     as delay_bucket,
+        {{ delay_bucket('delay_days') }}                        as delay_bucket,
         delay_days > 0                                          as is_late,
         review_score,
         is_low_score,

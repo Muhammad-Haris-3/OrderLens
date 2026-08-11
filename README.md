@@ -10,10 +10,36 @@ recommendation a business could act on.
 **The deliverable is a decision, not an app.** The pipeline exists to make that
 decision trustworthy and reproducible.
 
-> 🚧 **In progress.** M6 (Predictive model) complete. Breaching the promised
-> delivery date costs **1.71 review points** — but **67.5% of bad reviews sit on
-> orders that arrived on time**, which bounds what any delivery fix can achieve.
-> Dashboard and decision memo at M7. See [milestones](#milestones).
+> ✅ **Analysis complete — all seven milestones.** One manual step outstanding:
+> publishing the dashboard needs a Tableau Public account (FR-18, see
+> [spec](docs/dashboard_spec.md)).
+>
+> **The finding:** customers do not punish slow delivery. They punish **broken
+> promises**. Orders that take the *same* time to arrive score a full point lower
+> when they miss the quoted date. → **[Read the decision memo](docs/decision_memo.md)**
+
+---
+
+## The answer
+
+**Customers do not punish us for slow delivery. They punish us for broken
+promises.**
+
+Orders that took the same time to arrive score a full review point lower when
+they missed the quoted date. The effect survives controlling for the actual wait
+(−1.56 of a 5-point scale), and it is the *threshold* that costs, not the
+overshoot — being one day late does nearly all the damage.
+
+**Recommendation:** extend the quoted date only on routes that demonstrably miss
+it. Touches 19% of orders, cuts broken promises from 8.8% to 7.0%, and prevents
+~560 bad reviews a year. It is free to run; the risk is conversion, which this
+data cannot measure — so the deliverable is a costed A/B test, not a rollout.
+
+**Two honest bounds:** two-thirds of bad reviews are on orders that arrived *on
+time*, so this addresses about a third of the problem; and with a 2.24% repeat
+rate, the case cannot rest on retention.
+
+→ **[The decision memo](docs/decision_memo.md)** (2 pages, no technical background needed)
 
 ---
 
@@ -182,6 +208,7 @@ confirm it actually fires; a test that cannot fail is decoration.
 python analysis/descriptive.py     # M4 — regenerates docs/descriptive_results.md
 python analysis/inferential.py     # M5 — regenerates docs/inferential_results.md
 python analysis/predictive.py      # M6 — regenerates docs/predictive_results.md
+python analysis/decision.py        # M7 — regenerates docs/decision_results.md
 ```
 
 **Aggregation happens in SQL, not in Python.** Every count, sum, rate and ranking
@@ -262,7 +289,7 @@ reproduce.
 | M4 | Descriptive — delivery, cohorts, RFM, revenue concentration | FR-5–8 | ✅ [Summary](OrderLens_M4_Summary.md) |
 | M5 | Inferential — effect sizes, controlled regression | FR-9–13 | ✅ [Summary](OrderLens_M5_Summary.md) |
 | M6 | Predictive — cost-optimised classifier | FR-14–17 | ✅ [Summary](OrderLens_M6_Summary.md) |
-| M7 | Communication — dashboard, decision memo, A/B design | FR-18–21 | ⬜ |
+| M7 | Communication — dashboard, decision memo, A/B design | FR-18–21 | ✅ [Summary](OrderLens_M7_Summary.md) |
 
 ---
 
@@ -286,6 +313,9 @@ along the way.
 | [Inferential Results](docs/inferential_results.md) | Generated evidence: every test statistic, confidence interval and p-value |
 | [Predictive Findings](docs/predictive_findings.md) | The classifier, its cost-based threshold, and why its ceiling matters more than its score |
 | [Predictive Results](docs/predictive_results.md) | Generated evidence: baselines, thresholds, importances, calibration |
+| **[Decision Memo](docs/decision_memo.md)** | **Two pages, plain language — the deliverable this project exists to produce** |
+| [Decision Results](docs/decision_results.md) | Generated evidence: mechanism test, policy simulation, break-even, A/B power |
+| [Dashboard Spec](docs/dashboard_spec.md) | Three views, fields, colourblind-safe encodings, and what the dashboard must not imply |
 
 Model-level documentation lives with the models:
 [staging](dbt_orderlens/models/staging/_staging_models.yml),
@@ -305,4 +335,5 @@ found — including the ones that were caught before they did damage.
 | [M4](OrderLens_M4_Summary.md) | Descriptive analysis | Review timing is *caused by* the delay — 96% of late orders were reviewed before arrival, which overturned an M2 handling decision |
 | [M5](OrderLens_M5_Summary.md) | Inferential analysis | BQ-3's premise is false: there is no per-day price. Breaching the promise costs 1.71 review points; the next 113 days cost as much again |
 | [M6](OrderLens_M6_Summary.md) | Predictive model | Two-thirds of bad reviews are on orders that arrived *on time* — so fixing delivery entirely reaches at most a third of the problem |
+| [M7](OrderLens_M7_Summary.md) | Communication | The damage is the broken promise, not the wait — and the obvious fix (recalculating quotes from route history) makes things measurably worse |
 

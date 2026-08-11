@@ -1,0 +1,183 @@
+# Dashboard build specification (FR-18)
+
+**Status:** specified and data-ready. **Publishing requires a Tableau Public
+account and its desktop client**, so the final step is manual — see §6.
+
+**Satisfies:** FR-18 (public interactive dashboard covering delivery performance,
+satisfaction and segment drill-down) and NFR-6 (colourblind-safe, no meaning
+encoded by colour alone).
+
+---
+
+## 1. Connection
+
+Tableau Public connects **directly to `analytics_marts`** — no extracts, no
+hand-maintained CSVs (Design Phase §9). A dashboard fed by a spreadsheet drifts
+from the warehouse the first time anyone is in a hurry.
+
+| Setting | Value |
+|---|---|
+| Connector | PostgreSQL |
+| Server | the `DBT_HOST` in `.env` |
+| Port | 5432 |
+| Database | `DBT_DBNAME` |
+| Schema | `analytics_marts` |
+| SSL | Require |
+
+**Use a read-only role.** The dashboard has no business writing, and Tableau
+Public credentials live on a laptop.
+
+```sql
+CREATE ROLE tableau_reader LOGIN PASSWORD '...';
+GRANT USAGE ON SCHEMA analytics_marts TO tableau_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA analytics_marts TO tableau_reader;
+```
+
+---
+
+## 2. Sources — one per view, no joins in Tableau
+
+Every aggregate the dashboard shows already exists as a mart. Joining in Tableau
+would recompute definitions that dbt already owns and lets the dashboard disagree
+with the analysis.
+
+| View | Mart | Grain |
+|---|---|---|
+| Operations | `mart_delivery_monthly` | one purchase month |
+| Impact | `mart_delay_buckets` | one delay band |
+| Drill-down | `mart_revenue_concentration` | (dimension, key) |
+| Drill-down detail | `mart_order_analysis` | one delivery-eligible order |
+
+`mart_order_analysis.delay_bucket` uses the same macro as `mart_delay_buckets`,
+so the summary and the drill-down cannot disagree — verified: all eight bands
+match exactly across the two grains.
+
+---
+
+## 3. The three views
+
+### View 1 — Operations: are we keeping our promise?
+
+| Element | Spec |
+|---|---|
+| **Headline** | On-time rate, latest month, with month-over-month change |
+| **Chart 1** | Line: `pct_late` by `year_month`. Reference line at the 20-month average |
+| **Chart 2** | Stacked area: `mean_seller_handover_days` and `mean_carrier_transit_days` by month |
+| **Chart 3** | Line: `mean_review_score` by month, dual axis with `pct_late` |
+| **Filter** | Date range, defaulting to the full trend window |
+
+**The point of Chart 2 is the split.** "Deliveries are late" is not actionable.
+"The carrier owns 74% of the wait and all of the variance, while seller handover
+barely moves" is. Annotate the two failure episodes (November 2017, February–March
+2018) directly on Chart 1 — both are carrier-side.
+
+**Axis note:** the trend window is 2017-01 to 2018-08. It must be stated *on the
+axis*, not in a footnote (M2 F-06): 2016 is a 329-order pilot and the final two
+months are a truncated tail with no deliveries.
+
+### View 2 — Impact: what does a broken promise cost?
+
+| Element | Spec |
+|---|---|
+| **Chart 1** | Bar: `mean_review_score` by `delay_bucket`, ordered by the bucket's leading digit |
+| **Chart 2** | Bar: `pct_low_score` by `delay_bucket` |
+| **Chart 3** | Bar: `revenue` by `delay_bucket` — the money sitting in each band |
+| **Annotation** | A marker between "on the promised day" and "1–7 days late" reading *"the cliff: 12% → 49% low scores"* |
+
+**The cliff is the whole message.** Do not smooth these into a line chart: the
+relationship is a step, and a line implies a gradient that does not exist.
+
+Chart 1 needs a **caveat caption**, not a footnote: *"Reviews are sent at
+dispatch, so most late orders were reviewed before arrival — these bars partly
+measure waiting, not receiving."*
+
+### View 3 — Drill-down: where is it concentrated?
+
+| Element | Spec |
+|---|---|
+| **Control** | Parameter switching `dimension` between category / seller / customer_state |
+| **Chart 1** | Pareto: `revenue` bars descending with `cumulative_pct_of_revenue` as a line, 80% reference line |
+| **Chart 2** | Scatter: `pct_late` (x) against `revenue` (y), one mark per member, labelled |
+| **Chart 3** | Map: `customer_state` shaded by `pct_late`, sized by revenue |
+| **Filter** | Minimum order count, to suppress noisy small segments |
+
+**Chart 2 is the BQ-4 answer** and should be the dashboard's most prominent
+panel. It separates *large* from *failing*: São Paulo sits bottom-right (huge
+revenue, low failure rate), Rio de Janeiro sits upper-middle (large revenue,
+triple the failure rate), Maranhão sits upper-left (small, failing badly). Draw
+quadrant lines at the revenue median and the platform late rate, and label the
+upper-right quadrant **"fix first"**.
+
+---
+
+## 4. NFR-6 — accessibility
+
+**Colourblind-safe palette.** Tableau's built-in *Color Blind 10*, or:
+
+| Meaning | Hex | |
+|---|---|---|
+| On time / good | `#0173B2` | blue |
+| Late / bad | `#DE8F05` | orange |
+| Neutral | `#949494` | grey |
+| Emphasis | `#029E73` | green |
+
+Blue–orange rather than red–green: red–green is the pairing 8% of men cannot
+distinguish, and it is the pairing every operations dashboard reaches for first.
+
+**No meaning encoded by colour alone.** Every colour-coded state also carries a
+second channel:
+
+| Where | Colour | Plus |
+|---|---|---|
+| Delay buckets | blue → orange ramp | The bucket label on every bar |
+| On-time vs late series | blue / orange | Solid vs dashed line, and a direct end-of-line label |
+| Scatter quadrants | fill | Quadrant border lines and a text label per quadrant |
+| Map | sequential shade | The rate printed in each state's tooltip and on the top five |
+
+**Also:**
+- Every axis labelled with its unit (`days`, `%`, `R$`).
+- No dual-axis chart without both axes labelled and coloured to match their series.
+- Tooltips give the underlying counts, not just the percentage — a 17% late rate
+  on 346 orders is not the same claim as 17% on 40,000.
+- Minimum 11pt type; no text baked into images.
+
+---
+
+## 5. What the dashboard must not imply
+
+Three guardrails, because a dashboard is read faster than it is explained:
+
+1. **Do not put the classifier on it.** M6 measured 14% precision at the
+   operating threshold — six of every seven flagged orders would have been fine.
+   A "risk score" column would be acted on far beyond what it can support.
+2. **Do not headline the review score as a satisfaction KPI without the
+   two-thirds caveat.** 67.5% of low reviews are on orders that arrived on time
+   (M6). A delivery dashboard that owns the review score implies delivery drives
+   it, and it mostly does not.
+3. **Do not show retention.** 2.24% of customers ever return (M4). A cohort
+   retention chart at that level is a flat line at zero, and putting it on a
+   dashboard invites someone to read a trend into noise.
+
+---
+
+## 6. Publishing — the manual step
+
+Tableau Public requires its desktop client and a personal account, so this step
+cannot be automated from here:
+
+1. Install Tableau Public Desktop, sign in.
+2. Connect to `analytics_marts` with the read-only role from §1.
+3. Build the three views above as separate sheets, then one dashboard with tabs.
+4. **File → Save to Tableau Public As…**
+5. Add the resulting URL to the README badge and to SRS acceptance criterion §14.4.
+
+**Until that URL exists, FR-18 is specified and data-ready but not delivered**,
+and acceptance criterion §14.4 ("the dashboard is publicly reachable by URL")
+remains open. Recorded as open rather than quietly marked complete.
+
+**One caution before publishing.** Tableau Public makes both the workbook and its
+data public (SRS risk R-7). That is acceptable here — the dataset is already
+public and anonymised, geolocation is aggregated to ZIP prefix, and customer keys
+are opaque hashes. It would not be acceptable against a real marketplace's
+warehouse, and the read-only role should be scoped to `analytics_marts` only so
+that never becomes a question.

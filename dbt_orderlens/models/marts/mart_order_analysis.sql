@@ -139,6 +139,10 @@ select
         )::numeric, 2)
     end                                                     as distance_km,
 
+    -- Same definition as mart_delay_buckets, from the same macro. The dashboard
+    -- drills from the aggregate into this grain, and the two must agree.
+    {{ delay_bucket('delay_days') }}                         as delay_bucket,
+
     customer_state = seller_state                           as is_same_state,
 
     extract(year  from purchased_at)::int                   as purchase_year,
