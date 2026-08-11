@@ -23,25 +23,96 @@ decision trustworthy and reproducible.
 
 ## The answer
 
-**Customers do not punish us for slow delivery. They punish us for broken
-promises.**
+The obvious assumption is *"deliveries are slow, make them faster"* — an
+expensive fix. The data says something different.
 
-Orders that took the same time to arrive score a full review point lower when
-they missed the quoted date. The effect survives controlling for the actual wait
-(−1.56 of a 5-point scale), and it is the *threshold* that costs, not the
-overshoot — being one day late does nearly all the damage.
+Take only the orders that took **the same time to arrive** — 10 to 13 days.
+Split them by whether that broke the promised date:
+
+| | Mean review score |
+|---|---|
+| Arrived within the promised date | **4.30** |
+| Missed the promised date | **3.31** |
+
+Same wait. Same products. One difference: what the customer was told. That gap
+holds at every delivery speed, from 6 days to 40, and it survives controlling for
+the actual wait, price, distance, category, region and season (−1.56 on a 5-point
+scale).
+
+**The damage isn't the wait. It's the gap between what we promised and what we
+delivered.**
 
 **Recommendation:** extend the quoted date only on routes that demonstrably miss
-it. Touches 19% of orders, cuts broken promises from 8.8% to 7.0%, and prevents
-~560 bad reviews a year. It is free to run; the risk is conversion, which this
-data cannot measure — so the deliverable is a costed A/B test, not a rollout.
+it — never shorten. Touches 19% of orders, cuts broken promises from 8.8% to
+7.0%, prevents ~560 bad reviews a year. It costs nothing to run; the risk is
+losing the sale to a longer quote, which this data *cannot* measure — so the
+deliverable is a costed A/B test, not a rollout.
 
 **Two honest bounds:** two-thirds of bad reviews are on orders that arrived *on
 time*, so this addresses about a third of the problem; and with a 2.24% repeat
 rate, the case cannot rest on retention.
 
 → **[The decision memo](docs/decision_memo.md)** (2 pages, no technical background needed)
-→ **[The dashboard](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)** (Tableau Public — delivery performance, impact, and where to fix it first)
+→ **[The dashboard](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)** (Tableau Public)
+
+---
+
+## Three times the obvious answer was wrong
+
+This is the part worth reading. Every one of these was found by testing something
+that looked safe, and each is recorded in full rather than tidied away.
+
+### 1. A bug that was hiding 14% of the finding
+
+The promised delivery date is stored as a **date** — midnight. The actual
+delivery is a **timestamp**. Subtracting one from the other marks any parcel
+arriving after midnight on the promised day as late.
+
+That misfiled **1,292 orders that arrived exactly when promised**. Their mean
+review score is 4.03 — they behave like on-time deliveries, because they *were*
+on-time deliveries. Counting them as late dragged the headline effect down by
+**14%**.
+
+Nothing failed. No error, no null, no row-count change. Just an answer that was
+quietly too small, with nothing to compare it against.
+→ [Data-quality audit, F-01](docs/data_quality_audit.md)
+
+### 2. My own earlier decision, overturned
+
+M2 decided to exclude reviews written before the parcel arrived — they can't
+reflect a delivery that hadn't happened.
+
+M4 measured *where* those reviews actually are: **0.2% of on-time orders, and
+96–99% of late ones.** Whether a review predates delivery is *caused by* the
+delay. Excluding them doesn't remove a bias — it drops 70% of the late orders and
+creates one.
+
+The earlier decision was reversed. The superseded text is struck through in the
+audit rather than deleted, so the reasoning stays visible.
+→ [Descriptive findings](docs/descriptive_findings.md)
+
+### 3. The obvious fix made things worse
+
+Having established that promises are the problem, the natural recommendation is
+*"recalculate every delivery estimate from route history."*
+
+Simulated out-of-sample — rules fitted on 2017, scored on 52,777 orders from 2018
+— it raised broken promises from **8.8% to 11.3%**. The platform's existing
+estimates were already *more* conservative than history suggested, so replacing
+them shortened promises on the good routes and bought more failures than it
+prevented.
+
+The fix that works is narrower: extend only where a route demonstrably misses,
+never shorten anywhere.
+→ [M7 summary, §3](OrderLens_M7_Summary.md)
+
+### And one model, built and then argued against
+
+The classifier predicting which orders will go wrong flags **seven orders to
+catch one real problem**. It is reported as too weak to deploy rather than dressed
+up — at a 9.7% base rate, a model that says *"no order is ever at risk"* scores
+90.3% accuracy, which is why accuracy appears nowhere in this project.
+→ [Predictive findings](docs/predictive_findings.md)
 
 ---
 
@@ -58,8 +129,8 @@ survive being challenged on it:
 - **The causal claim is defended.** Delay-to-satisfaction is estimated with
   controls, and the limits of an observational design are stated explicitly
   rather than glossed.
-- **Negative results ship.** If delay turns out not to drive satisfaction once
-  confounders are handled, that is the finding (SRS NFR-8).
+- **Negative results ship.** The model that didn't work, the fix that made things
+  worse, and the decision that had to be reversed are all above, not buried.
 
 ---
 
