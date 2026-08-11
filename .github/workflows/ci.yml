@@ -24,9 +24,18 @@ jobs:
       - name: Tests
         run: pytest -q
 
-      # dbt models arrive in M3. Once they exist this job gains
-      # `dbt build` against a CI warehouse, which runs the models AND the
-      # data-quality tests declared in _sources.yml / schema.yml.
+      - name: Install dbt packages
+        working-directory: dbt_orderlens
+        run: dbt deps
+
+      # `dbt parse` compiles every model, test and macro — Jinja, refs, sources
+      # and the dependency graph — without connecting to a warehouse. The
+      # credentials below are placeholders that are never used; a profile simply
+      # has to exist for the project to load.
+      #
+      # This step used to end in `|| echo "::warning::"` because no models existed
+      # before M3. They exist now, so it fails properly: a broken ref or an
+      # unparseable model must not reach main.
       - name: Validate dbt project parses
         working-directory: dbt_orderlens
         env:
@@ -36,4 +45,9 @@ jobs:
           DBT_DBNAME: ci
           DBT_SCHEMA: analytics
           DBT_PORT: "5432"
-        run: dbt parse --profiles-dir . --project-dir . || echo "::warning::dbt parse skipped until M3 adds models"
+        run: dbt parse --profiles-dir . --project-dir .
+
+      # NOT run in CI: `dbt build`. It needs the loaded warehouse, and the dataset
+      # is ~120 MB of CSV that is not committed (see data/raw/README.md). The data
+      # tests run locally against Neon and their result is recorded in the
+      # milestone summary. What CI can enforce without data, it does.

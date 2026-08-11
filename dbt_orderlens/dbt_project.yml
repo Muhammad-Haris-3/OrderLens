@@ -14,6 +14,31 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+vars:
+  # Settled by the M2 data-quality audit — see docs/data_quality_audit.md.
+  # Declared here rather than inlined so the models and the tests that check them
+  # cannot drift apart: a bounding box written twice is a bounding box that will
+  # eventually disagree with itself.
+
+  # Brazil's bounding box (M2 finding F-13, check A-22). 42 geolocation points
+  # fall outside it and are discarded before the prefix centroid is averaged.
+  brazil_min_lat: -34
+  brazil_max_lat: 6
+  brazil_min_lng: -74
+  brazil_max_lng: -33
+
+  # RFM recency anchor (M2 decision D-5, check A-30). NOT the maximum purchase
+  # timestamp of 2018-10-17: September and October 2018 carry 16 and 4 orders
+  # against ~6,500 a month, and none of those 20 was ever delivered. That tail is
+  # a truncation artefact, and anchoring to it adds 47 days of artificial
+  # staleness to every customer.
+  analysis_anchor_date: "2018-08-31"
+
+  # Full-coverage trend and cohort window (M2 finding F-06). 2016 carries 329
+  # orders in total and November 2016 has none at all.
+  trend_window_start: "2017-01-01"
+  trend_window_end: "2018-08-31"
+
 models:
   orderlens:
     staging:

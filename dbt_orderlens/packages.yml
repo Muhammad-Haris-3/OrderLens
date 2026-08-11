@@ -1,0 +1,7 @@
+packages:
+  # Needed for unique_combination_of_columns: three models in this project have a
+  # compound grain — (order_id, order_item_id) and (order_id, payment_sequential)
+  # — and dbt's built-in `unique` test only takes a single column. Hand-rolling a
+  # compound uniqueness test per model is three chances to write it wrong.
+  - package: dbt-labs/dbt_utils
+    version: 1.3.0

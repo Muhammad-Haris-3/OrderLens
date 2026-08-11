@@ -1,0 +1,180 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: >
+      One order. 99,441 rows, 1:1 with raw.orders. Timestamps typed and renamed to
+      the `_at` convention; estimated_delivery_date deliberately typed as DATE
+      because that is what the source stores (M2 A-10).
+    columns:
+      - name: order_id
+        description: Primary key.
+        tests: [unique, not_null]
+      - name: customer_id
+        description: Per-order key. dim_customers keys on customer_unique_id (R-1).
+        tests: [not_null]
+      - name: order_status
+        tests:
+          - not_null
+          - accepted_values:
+              values: [delivered, shipped, canceled, unavailable, invoiced,
+                       processing, created, approved]
+      - name: purchased_at
+        tests: [not_null]
+      - name: estimated_delivery_date
+        description: >
+          A DATE, not a timestamp. Comparing it against the delivery TIMESTAMP is
+          the M2 headline bug (F-01) — see fct_orders.delay_days.
+        tests: [not_null]
+
+  - name: stg_order_items
+    description: One item within an order. 112,650 rows.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [order_id, order_item_id]
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: order_item_id
+        description: Sequence within the order — NOT globally unique.
+        tests: [not_null]
+      - name: price
+        description: R$0.85 to R$6,735.00, no zeros or negatives (A-23).
+        tests: [not_null]
+      - name: freight_value
+        description: Zero on 383 items — free shipping is a promotion, not an error.
+        tests: [not_null]
+      - name: product_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_products')
+              field: product_id
+      - name: seller_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sellers')
+              field: seller_id
+
+  - name: stg_order_payments
+    description: One payment instrument per order. 103,886 rows. NOT the source of revenue.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [order_id, payment_sequential]
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: payment_type
+        description: not_defined is a real source value on 3 zero-value rows (A-25).
+        tests:
+          - not_null
+          - accepted_values:
+              values: [credit_card, boleto, voucher, debit_card, not_defined]
+      - name: payment_value
+        tests: [not_null]
+
+  - name: stg_order_reviews
+    description: >
+      One review per ORDER after deduplication — 98,673 rows from 99,224 source
+      rows (M2 decision D-1). The uniqueness test on order_id below is the whole
+      point of this model: it asserts something that is FALSE in the source and
+      true here.
+    columns:
+      - name: order_id
+        description: The grain. Unique here, not unique in the source.
+        tests:
+          - unique
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: review_id
+        description: >
+          Deliberately NOT tested for uniqueness. 789 review_ids appear against
+          several different orders — one survey covering a basket, not a duplicate
+          row (A-04). A test on this would fail on every build forever.
+        tests: [not_null]
+      - name: review_score
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+              quote: false
+      - name: review_count
+        description: Reviews this order carried before dedup. 547 orders have >1.
+        tests: [not_null]
+
+  - name: stg_customers
+    description: One customer_id — the PER-ORDER key. Not deduplicated to the person.
+    columns:
+      - name: customer_id
+        tests: [unique, not_null]
+      - name: customer_unique_id
+        description: The person. 99,441 ids collapse to 96,096 people (A-19).
+        tests: [not_null]
+      - name: zip_prefix
+        tests: [not_null]
+      - name: state
+        tests: [not_null]
+
+  - name: stg_sellers
+    description: One seller. 3,095 rows.
+    columns:
+      - name: seller_id
+        tests: [unique, not_null]
+      - name: zip_prefix
+        tests: [not_null]
+      - name: state
+        tests: [not_null]
+
+  - name: stg_products
+    description: >
+      One product. 32,951 rows. Source misspellings corrected at this boundary;
+      zero weights set to null (M2 F-15) because a product does not weigh nothing.
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
+      - name: category_pt
+        description: >
+          Null on 610 products. NOT tested for not_null — the absence is real and
+          dim_products labels it 'uncategorised' rather than dropping it.
+      - name: product_weight_g
+        description: Null on 6 products — 2 missing in source, 4 recorded as zero.
+
+  - name: stg_product_categories
+    description: Portuguese-to-English category lookup. 71 rows against 73 categories in use.
+    columns:
+      - name: category_pt
+        tests: [unique, not_null]
+      - name: category_en
+        tests: [unique, not_null]
+
+  - name: stg_geolocation
+    description: >
+      One ZIP prefix — 19,010 rows aggregated from 1,000,163. THIS MODEL KILLS
+      RISK R-2. The uniqueness test below is the assertion that the 52.6x fan-out
+      is dead; without it a downstream join silently multiplies revenue by fifty.
+
+      19,010 rather than 19,015 prefixes: five prefixes consisted entirely of
+      out-of-bounds coordinates and were removed with them (M2 F-13). One customer
+      is affected.
+    columns:
+      - name: zip_prefix
+        description: Unique here. Emphatically not unique in the source.
+        tests: [unique, not_null]
+      - name: latitude
+        tests: [not_null]
+      - name: longitude
+        tests: [not_null]
+      - name: source_point_count
+        description: Points behind this centroid. A centroid from 2 is not a centroid from 1,146.
+        tests: [not_null]
