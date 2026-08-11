@@ -10,11 +10,10 @@ recommendation a business could act on.
 **The deliverable is a decision, not an app.** The pipeline exists to make that
 decision trustworthy and reproducible.
 
-> 🚧 **In progress.** M5 (Inferential analysis) complete — the controlled
-> estimate and its [limitations](docs/inferential_findings.md) are in. Breaching
-> the promised delivery date costs **1.71 review points**; each further day of
-> lateness costs 0.015. Classifier at M6, dashboard and decision memo at M7. See
-> [milestones](#milestones).
+> 🚧 **In progress.** M6 (Predictive model) complete. Breaching the promised
+> delivery date costs **1.71 review points** — but **67.5% of bad reviews sit on
+> orders that arrived on time**, which bounds what any delivery fix can achieve.
+> Dashboard and decision memo at M7. See [milestones](#milestones).
 
 ---
 
@@ -174,6 +173,7 @@ confirm it actually fires; a test that cannot fail is decoration.
 ```bash
 python analysis/descriptive.py     # M4 — regenerates docs/descriptive_results.md
 python analysis/inferential.py     # M5 — regenerates docs/inferential_results.md
+python analysis/predictive.py      # M6 — regenerates docs/predictive_results.md
 ```
 
 **Aggregation happens in SQL, not in Python.** Every count, sum, rate and ranking
@@ -193,7 +193,7 @@ with them. A test enforces it: anything in `analysis/` that reaches into `raw` o
 ## Testing
 
 ```bash
-pytest -q          # 37 tests — no data or database required
+pytest -q          # 43 tests — no data or database required
 ruff check .       # lint
 ```
 
@@ -211,6 +211,11 @@ The suite guards specific silent failures rather than exercising code paths:
 - **dbt structural rules** — staging models never join, marts never read `raw`
   directly, `delay_days` is still computed on `::date`, `dim_customers` is still
   keyed on the person, and every bespoke test still exists by name.
+- **The M6 leakage rule** — no post-delivery column is declared as a model
+  feature, the feature mart projects none, and the seller track record is still
+  computed as-of the purchase timestamp. Training on `is_late` would look superb
+  and be worthless; these tests run without a database so a leak cannot reach
+  `main` even if nobody runs the model.
 
 `dbt build` needs the loaded warehouse and ~120 MB of uncommitted CSV, so CI runs
 `dbt parse` instead — which compiles every model, test and macro without
@@ -228,7 +233,7 @@ connecting — plus the structural tests above.
 | M3 | Dimensional model — staging + marts, tests green | FR-2, FR-3 | ✅ [Summary](OrderLens_M3_Summary.md) |
 | M4 | Descriptive — delivery, cohorts, RFM, revenue concentration | FR-5–8 | ✅ [Summary](OrderLens_M4_Summary.md) |
 | M5 | Inferential — effect sizes, controlled regression | FR-9–13 | ✅ [Summary](OrderLens_M5_Summary.md) |
-| M6 | Predictive — cost-optimised classifier | FR-14–17 | ⬜ |
+| M6 | Predictive — cost-optimised classifier | FR-14–17 | ✅ [Summary](OrderLens_M6_Summary.md) |
 | M7 | Communication — dashboard, decision memo, A/B design | FR-18–21 | ⬜ |
 
 ---
@@ -251,6 +256,8 @@ along the way.
 | [Descriptive Results](docs/descriptive_results.md) | Generated evidence for the above, straight from the analysis marts |
 | [Inferential Findings](docs/inferential_findings.md) | The controlled estimate, and **the FR-12 limitations statement** — what the number is and is not worth |
 | [Inferential Results](docs/inferential_results.md) | Generated evidence: every test statistic, confidence interval and p-value |
+| [Predictive Findings](docs/predictive_findings.md) | The classifier, its cost-based threshold, and why its ceiling matters more than its score |
+| [Predictive Results](docs/predictive_results.md) | Generated evidence: baselines, thresholds, importances, calibration |
 
 Model-level documentation lives with the models:
 [staging](dbt_orderlens/models/staging/_staging_models.yml),
@@ -269,4 +276,5 @@ found — including the ones that were caught before they did damage.
 | [M3](OrderLens_M3_Summary.md) | Dimensional model | The geolocation fan-out is 151.7× on the join that matters, not the 52.6× the average suggested |
 | [M4](OrderLens_M4_Summary.md) | Descriptive analysis | Review timing is *caused by* the delay — 96% of late orders were reviewed before arrival, which overturned an M2 handling decision |
 | [M5](OrderLens_M5_Summary.md) | Inferential analysis | BQ-3's premise is false: there is no per-day price. Breaching the promise costs 1.71 review points; the next 113 days cost as much again |
+| [M6](OrderLens_M6_Summary.md) | Predictive model | Two-thirds of bad reviews are on orders that arrived *on time* — so fixing delivery entirely reaches at most a third of the problem |
 

@@ -389,3 +389,43 @@ models:
           - accepted_values: {values: [summer, autumn, winter, spring]}
       - name: order_item_total
         tests: [not_null]
+
+  - name: mart_prediction_features
+    description: >
+      The M6 feature table. One delivery-eligible order carrying a review —
+      95,824 rows. EVERY COLUMN IS KNOWN AT PURCHASE TIME; that is the model's
+      whole claim, and analysis/predictive.py asserts it again against a denylist
+      before a model sees anything.
+
+      The seller track-record columns are computed AS-OF the purchase timestamp.
+      A naive `avg(is_late) group by seller` would include this order's own
+      outcome and every future order's — a catastrophic leak that would look
+      excellent in backtest and be unavailable in production. Late rates count
+      prior orders DELIVERED before this one was purchased; low-score rates count
+      prior reviews ANSWERED before it, because a review that exists but has not
+      been written yet is not information anyone had.
+
+      Built as an event-stream window rather than a correlated subquery: the
+      obvious form takes ~21 minutes over 96k rows, this takes seconds.
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+      - name: is_low_score
+        description: The target. 12.81% of rows.
+        tests: [not_null]
+      - name: estimated_days
+        description: The promise shown at purchase — known pre-delivery.
+        tests: [not_null]
+      - name: seller_prior_deliveries
+        description: Seller's orders delivered before this one was purchased. 0 for a seller's first.
+        tests: [not_null]
+      - name: seller_prior_late_rate
+        description: >
+          Null where the seller had no prior delivery — 5,230 orders. Null, not 0:
+          an unknown track record is not a clean one.
+      - name: seller_prior_low_score_rate
+        description: As above, counted on reviews ANSWERED before this purchase.
+      - name: primary_category
+        tests: [not_null]
+      - name: season
+        tests: [not_null]
