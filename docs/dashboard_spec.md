@@ -9,44 +9,70 @@ encoded by colour alone).
 
 ---
 
-## 1. Connection
+## 1. Connection — corrected
 
-Tableau Public connects **directly to `analytics_marts`** — no extracts, no
-hand-maintained CSVs (Design Phase §9). A dashboard fed by a spreadsheet drifts
-from the warehouse the first time anyone is in a hurry.
+> ### ⚠️ The Design Phase assumption was wrong
+>
+> Design Phase §9 says *"Tableau Public connects directly to `analytics_marts` —
+> no extracts, no hand-maintained CSVs, so the dashboard cannot drift from the
+> warehouse."* **That is not possible.**
+>
+> Tableau **Public** — the free edition — offers only file-based and a few cloud
+> connectors. PostgreSQL is a paid Tableau Desktop feature, and everything
+> published to Tableau Public is uploaded as data rather than queried live.
+>
+> The assumption was made at M0, chosen the warehouse (§9.2 rejected DuckDB
+> partly *because* "a dashboard cannot connect to it"), and went unchallenged
+> until someone tried to follow the instructions at M7. Recorded rather than
+> quietly edited, because a design decision justified by a false premise is worth
+> knowing about.
 
-| Setting | Value |
-|---|---|
-| Connector | PostgreSQL |
-| Server | the `DBT_HOST` in `.env` |
-| Port | 5432 |
-| Database | `DBT_DBNAME` |
-| Schema | `analytics_marts` |
-| SSL | Require |
+**The route is a file extract.**
 
-**Use a read-only role.** The dashboard has no business writing, and Tableau
-Public credentials live on a laptop.
-
-```sql
-CREATE ROLE tableau_reader LOGIN PASSWORD '...';
-GRANT USAGE ON SCHEMA analytics_marts TO tableau_reader;
-GRANT SELECT ON ALL TABLES IN SCHEMA analytics_marts TO tableau_reader;
+```bash
+python scripts/export_dashboard_data.py
 ```
+
+Writes four CSVs plus a timestamp to `data/dashboard/` (gitignored — derived
+artefacts, regenerated in seconds):
+
+| File | Rows | Feeds |
+|---|---|---|
+| `delivery_monthly.csv` | 20 | View 1 |
+| `delay_buckets.csv` | 8 | View 2 |
+| `revenue_concentration.csv` | 3,196 | View 3 |
+| `orders.csv` | 96,470 | View 3 drill-down |
+| `exported_at.csv` | 1 | The freshness stamp |
+
+**What this costs.** The dashboard becomes a snapshot and can drift from the
+warehouse — the exact failure the "no extracts" rule existed to prevent. Two
+things keep it honest:
+
+1. `exported_at.csv` is placed on the dashboard as a caption. A stale dashboard
+   says how stale it is rather than looking current.
+2. Refreshing is `export_dashboard_data.py` + re-publish, and it is documented
+   here rather than living in someone's memory.
+
+**If a live connection is ever needed**, it requires paid Tableau Desktop plus
+Tableau Server/Cloud, or a different tool. That is a cost decision, not a
+technical blocker, and it is out of scope under NFR-7 (zero monetary cost).
 
 ---
 
 ## 2. Sources — one per view, no joins in Tableau
 
-Every aggregate the dashboard shows already exists as a mart. Joining in Tableau
-would recompute definitions that dbt already owns and lets the dashboard disagree
-with the analysis.
+Every aggregate the dashboard shows already exists as a mart, and the export
+preserves that. Joining in Tableau would recompute definitions dbt already owns
+and let the dashboard disagree with the analysis.
 
-| View | Mart | Grain |
-|---|---|---|
-| Operations | `mart_delivery_monthly` | one purchase month |
-| Impact | `mart_delay_buckets` | one delay band |
-| Drill-down | `mart_revenue_concentration` | (dimension, key) |
-| Drill-down detail | `mart_order_analysis` | one delivery-eligible order |
+| View | File | Mart behind it | Grain |
+|---|---|---|---|
+| Operations | `delivery_monthly.csv` | `mart_delivery_monthly` | one purchase month |
+| Impact | `delay_buckets.csv` | `mart_delay_buckets` | one delay band |
+| Drill-down | `revenue_concentration.csv` | `mart_revenue_concentration` | (dimension, key) |
+| Drill-down detail | `orders.csv` | `mart_order_analysis` | one delivery-eligible order |
+
+Add each as a **separate data source** in Tableau, not as a join.
 
 `mart_order_analysis.delay_bucket` uses the same macro as `mart_delay_buckets`,
 so the summary and the drill-down cannot disagree — verified: all eight bands
@@ -163,13 +189,25 @@ Three guardrails, because a dashboard is read faster than it is explained:
 ## 6. Publishing — the manual step
 
 Tableau Public requires its desktop client and a personal account, so this step
-cannot be automated from here:
+cannot be automated from here.
 
-1. Install Tableau Public Desktop, sign in.
-2. Connect to `analytics_marts` with the read-only role from §1.
-3. Build the three views above as separate sheets, then one dashboard with tabs.
-4. **File → Save to Tableau Public As…**
-5. Add the resulting URL to the README badge and to SRS acceptance criterion §14.4.
+1. **Export the data:** `python scripts/export_dashboard_data.py`
+2. **Create a free account** at [public.tableau.com](https://public.tableau.com)
+   → Sign Up.
+3. **Install Tableau Public Desktop** (free) from the same site, and sign in.
+4. **Connect:** Connect → To a File → Text file → `data/dashboard/delivery_monthly.csv`.
+   Add the other three the same way, each as its own data source.
+5. **Build** the three views from §3 as separate sheets, then one dashboard with
+   tabs.
+6. Put `exported_at` on the dashboard as a caption — a snapshot must say how old
+   it is.
+7. **File → Save to Tableau Public As…**, sign in, name it `OrderLens`.
+8. Copy the resulting URL into the README and SRS §14.4.
+
+**Row limits.** Tableau Public caps a workbook at 15 million rows. The largest
+file here is 96,470 rows and 17 MB, so there is no issue — but do not add
+`fct_order_items` (112,650 rows) without a reason, and do not export the raw
+layer at all.
 
 **Until that URL exists, FR-18 is specified and data-ready but not delivered**,
 and acceptance criterion §14.4 ("the dashboard is publicly reachable by URL")

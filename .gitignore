@@ -21,3 +21,6 @@ analysis/output/
 # OS
 .DS_Store
 Thumbs.db
+
+# Dashboard extracts — regenerate with scripts/export_dashboard_data.py
+data/dashboard/
