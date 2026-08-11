@@ -1,5 +1,9 @@
 # OrderLens — Marketplace Operations Analytics
 
+[![ci](https://github.com/Muhammad-Haris-3/OrderLens/actions/workflows/ci.yml/badge.svg)](https://github.com/Muhammad-Haris-3/OrderLens/actions/workflows/ci.yml)
+[![dashboard](https://img.shields.io/badge/dashboard-live-1f77b4)](https://public.tableau.com/app/profile/muhammad.haris2276/viz/OrderLens/Dashboard1)
+[![memo](https://img.shields.io/badge/decision%20memo-2%20pages-de8f05)](docs/decision_memo.md)
+
 > **Which operational failures cost the most revenue, and what should be fixed first?**
 
 An end-to-end analytics engagement on ~100k real marketplace orders: from nine
