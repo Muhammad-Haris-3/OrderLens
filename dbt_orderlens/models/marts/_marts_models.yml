@@ -204,3 +204,126 @@ models:
               values: [credit_card, boleto, voucher, debit_card, not_defined]
       - name: payment_value
         tests: [not_null]
+
+  # ===========================================================================
+  # ANALYSIS MARTS (M4) — aggregation lives in SQL, not in a notebook cell.
+  # SRS §9.2: Python is reserved for statistics and modelling. Every descriptive
+  # figure published in M4 is a select against one of these five models.
+  # ===========================================================================
+
+  - name: mart_delivery_monthly
+    description: >
+      FR-5 — delivery performance by purchase month, restricted to the 2017-01 to
+      2018-08 full-coverage window (M2 F-06). 20 rows.
+
+      The handover/transit split is what makes the eventual recommendation
+      actionable: the carrier owns roughly three quarters of the wait, and both
+      late-rate spikes are carrier-side while seller handover barely moves.
+    columns:
+      - name: year_month
+        tests: [unique, not_null]
+      - name: delivered_orders
+        tests: [not_null]
+      - name: pct_late
+        tests: [not_null]
+      - name: mean_carrier_transit_days
+        tests: [not_null]
+
+  - name: mart_delay_buckets
+    description: >
+      FR-5 — the delay distribution and what each band costs in satisfaction.
+      8 rows.
+
+      Buckets rather than a mean because the relationship is sharply non-linear.
+      pct_reviewed_before_delivery is the column to read twice: it climbs from
+      0.2% on on-time orders to over 96% on every late band, which makes review
+      timing a consequence of the delay rather than an independent nuisance.
+    columns:
+      - name: delay_bucket
+        tests: [unique, not_null]
+      - name: orders
+        tests: [not_null]
+      - name: pct_of_delivered
+        tests: [not_null]
+
+  - name: mart_cohort_retention
+    description: >
+      FR-6 — retention by first-purchase month, keyed on customer_unique_id
+      (risk R-1) and counted in SHOPPING DAYS rather than orders, because 897 of
+      2,997 repeat customers placed their second order the same day.
+
+      The curve is flat at well under 1%. That is the finding, not a defect
+      (SRS NFR-8).
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [cohort_month, months_since_first_order]
+    columns:
+      - name: cohort_month
+        tests: [not_null]
+      - name: months_since_first_order
+        tests: [not_null]
+      - name: cohort_customers
+        tests: [not_null]
+      - name: retention_pct
+        tests: [not_null]
+
+  - name: mart_customer_rfm
+    description: >
+      FR-7 — RFM per person. 96,096 rows, one per customer_unique_id.
+
+      The frequency dimension is degenerate: 96.88% of people placed exactly one
+      order, so f_score takes only the values 1, 3 and 5 and carries almost no
+      information. Scoring it into quintiles would have manufactured five
+      segments that differ in nothing. The segmentation leans on R and M, and
+      f_score is carried so the degeneracy is visible in the output.
+    columns:
+      - name: customer_unique_id
+        tests: [unique, not_null]
+      - name: r_score
+        tests:
+          - not_null
+          - accepted_values: {values: [1, 2, 3, 4, 5], quote: false}
+      - name: f_score
+        description: Only ever 1, 3 or 5 — see the model description.
+        tests:
+          - not_null
+          - accepted_values: {values: [1, 3, 5], quote: false}
+      - name: m_score
+        tests:
+          - not_null
+          - accepted_values: {values: [1, 2, 3, 4, 5], quote: false}
+      - name: monetary_value
+        tests: [not_null]
+      - name: rfm_segment
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Champions', 'Recent, promising', 'Recent, low value',
+                       'Needs attention', 'At risk, high value',
+                       'Lost, low value', 'Hibernating']
+
+  - name: mart_revenue_concentration
+    description: >
+      FR-8 — revenue ranked by category, seller and customer state, with
+      cumulative share for Pareto analysis. 3,196 rows across three dimensions.
+
+      Category and seller revenue are measured at ITEM grain because an order can
+      span several of each; state revenue at order grain. Seller late rates use
+      single-seller orders only (M2 F-12) — blaming every seller in a
+      multi-seller order for one delivery outcome would double-count the damage.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [dimension, dimension_key]
+    columns:
+      - name: dimension
+        tests:
+          - not_null
+          - accepted_values: {values: [category, seller, customer_state]}
+      - name: dimension_key
+        tests: [not_null]
+      - name: revenue
+        tests: [not_null]
+      - name: revenue_rank
+        tests: [not_null]
+      - name: cumulative_pct_of_revenue
+        tests: [not_null]

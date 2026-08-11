@@ -10,9 +10,10 @@ recommendation a business could act on.
 **The deliverable is a decision, not an app.** The pipeline exists to make that
 decision trustworthy and reproducible.
 
-> 🚧 **In progress.** M3 (Dimensional model) complete — the warehouse is loaded,
-> audited and modelled, with 156 dbt tests green. Headline findings land at M5;
-> dashboard and decision memo at M7. See [milestones](#milestones).
+> 🚧 **In progress.** M4 (Descriptive analysis) complete — 195 dbt tests green,
+> and the delivery, retention, RFM and concentration picture is in
+> [descriptive findings](docs/descriptive_findings.md). The controlled estimate
+> lands at M5; dashboard and decision memo at M7. See [milestones](#milestones).
 
 ---
 
@@ -167,10 +168,30 @@ confirm it actually fires; a test that cannot fail is decoration.
 
 ---
 
+## Running the analysis
+
+```bash
+python analysis/descriptive.py     # regenerates docs/descriptive_results.md
+```
+
+**Aggregation happens in SQL, not in Python.** Every count, sum, rate and ranking
+published in M4 is a `select` against one of five analysis marts
+(`mart_delivery_monthly`, `mart_delay_buckets`, `mart_cohort_retention`,
+`mart_customer_rfm`, `mart_revenue_concentration`). The script computes the Gini
+coefficients, the top-N share curve and the review-timing sensitivity — three
+things that are genuinely statistics — and nothing else.
+
+That is not stylistic. Because the numbers live in marts, the M7 dashboard reads
+the same definitions rather than a parallel set that will eventually disagree
+with them. A test enforces it: anything in `analysis/` that reaches into `raw` or
+`analytics_staging` fails the suite.
+
+---
+
 ## Testing
 
 ```bash
-pytest -q          # 36 tests — no data or database required
+pytest -q          # 37 tests — no data or database required
 ruff check .       # lint
 ```
 
@@ -203,7 +224,7 @@ connecting — plus the structural tests above.
 | M1 | Ingestion — raw layer loaded, row counts reconciled | FR-1 | ✅ [Summary](OrderLens_M1_Summary.md) |
 | M2 | Data-quality audit — anomalies found and adjudicated | FR-4 | ✅ [Summary](OrderLens_M2_Summary.md) |
 | M3 | Dimensional model — staging + marts, tests green | FR-2, FR-3 | ✅ [Summary](OrderLens_M3_Summary.md) |
-| M4 | Descriptive — delivery, cohorts, RFM, revenue concentration | FR-5–8 | ⬜ |
+| M4 | Descriptive — delivery, cohorts, RFM, revenue concentration | FR-5–8 | ✅ [Summary](OrderLens_M4_Summary.md) |
 | M5 | Inferential — effect sizes, controlled regression | FR-9–13 | ⬜ |
 | M6 | Predictive — cost-optimised classifier | FR-14–17 | ⬜ |
 | M7 | Communication — dashboard, decision memo, A/B design | FR-18–21 | ⬜ |
@@ -224,6 +245,8 @@ along the way.
 | [Data Dictionary](docs/data_dictionary.md) | Source fields, and every derived measure's exact formula |
 | [Data-Quality Audit](docs/data_quality_audit.md) | 17 findings graded and adjudicated, five deferred design decisions resolved — the M2 deliverable |
 | [Audit Results](docs/data_quality_audit_results.md) | Generated evidence: the exact rows every one of the 30 audit queries returned |
+| [Descriptive Findings](docs/descriptive_findings.md) | Delivery performance, retention, RFM and revenue concentration interpreted — the M4 deliverable |
+| [Descriptive Results](docs/descriptive_results.md) | Generated evidence for the above, straight from the analysis marts |
 
 Model-level documentation lives with the models:
 [staging](dbt_orderlens/models/staging/_staging_models.yml),
@@ -240,4 +263,5 @@ found — including the ones that were caught before they did damage.
 | [M1](OrderLens_M1_Summary.md) | Ingestion | A UTF-8 BOM that would have silently broken every category join |
 | [M2](OrderLens_M2_Summary.md) | Data-quality audit | A unit mismatch between the delivery promise and the delivery measurement, understating the project's central estimate by 14% |
 | [M3](OrderLens_M3_Summary.md) | Dimensional model | The geolocation fan-out is 151.7× on the join that matters, not the 52.6× the average suggested |
+| [M4](OrderLens_M4_Summary.md) | Descriptive analysis | Review timing is *caused by* the delay — 96% of late orders were reviewed before arrival, which overturned an M2 handling decision |
 

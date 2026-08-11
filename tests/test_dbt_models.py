@@ -41,7 +41,13 @@ BESPOKE_TESTS = {
     "assert_centroids_inside_brazil.sql":             "M2 finding F-13",
     "assert_delivery_measures_respect_eligibility.sql": "M2 finding F-03",
     "assert_order_value_reconciles_to_items.sql":     "cross-grain revenue agreement",
+    "assert_cumulative_share_reaches_100.sql":        "FR-8 Pareto arithmetic",
+    "assert_cohort_month_zero_is_complete.sql":       "FR-6 cohort base period",
 }
+
+# The analysis script's contract: statistics only. Anything that could have been
+# a GROUP BY belongs in a mart, where the dashboard can reach it (SRS §9.2).
+ANALYSIS = Path(__file__).resolve().parent.parent / "analysis"
 
 EXPECTED_STAGING = {
     "stg_orders", "stg_order_items", "stg_order_payments", "stg_order_reviews",
@@ -50,8 +56,12 @@ EXPECTED_STAGING = {
 }
 
 EXPECTED_MARTS = {
+    # Star schema (M3)
     "dim_customers", "dim_products", "dim_sellers", "dim_geography", "dim_dates",
     "fct_orders", "fct_order_items", "fct_payments",
+    # Analysis marts (M4) — aggregation lives in SQL, not in a notebook cell
+    "mart_delivery_monthly", "mart_delay_buckets", "mart_cohort_retention",
+    "mart_customer_rfm", "mart_revenue_concentration",
 }
 
 
@@ -158,6 +168,22 @@ def test_fct_orders_left_joins_items():
         "fct_orders must LEFT JOIN its item roll-up. An inner join deletes the "
         "775 unfulfilled orders, which are the population BQ-1 asks about."
     )
+
+
+def test_analysis_scripts_read_marts_only():
+    """Design Phase §8 — Python reads marts, never raw and never staging.
+
+    An analysis reaching into staging bypasses the review dedup; reaching into
+    raw bypasses everything M2 decided. Either way the published figure stops
+    matching the dashboard, and NFR-2 stops being true.
+    """
+    for path in sorted(ANALYSIS.glob("*.py")):
+        body = path.read_text(encoding="utf-8")
+        # Strip the module docstring — it discusses the rule it is obeying.
+        body = re.sub(r'^""".*?"""', "", body, count=1, flags=re.DOTALL)
+
+        assert "analytics_staging" not in body, f"{path.name} reads the staging layer"
+        assert not re.search(r"\braw\.\w+", body), f"{path.name} reads the raw layer"
 
 
 def test_dim_customers_is_keyed_on_the_person():

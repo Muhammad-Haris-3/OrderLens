@@ -456,7 +456,7 @@ enforced by an explicit feature allowlist, not by discipline.
 
 | Constraint | Applies to | Finding |
 |---|---|---|
-| Reviews answered before the parcel arrived (4,795, 4.98%) are **excluded from M6 training** and run as an **M5 sensitivity** — headline reported with and without | M5, M6 | F-09 |
+| ~~Reviews answered before the parcel arrived are excluded from M6 training~~ — **superseded by M4.** They are a post-treatment variable (0.2% of on-time orders, 96–99% of late ones), so excluding them selects a subset rather than removing bias. Headline uses all reviews; the after-delivery figure is a **stated selection bound** | M5, M6 | F-09, M4 |
 | Seller-level ranking is built from `fct_order_items`, **single-seller orders only**; the 1,278 multi-seller orders are reported as an explicit exclusion rather than attributed to every seller involved | M4 (BQ-4) | F-12 |
 | Hypothesis tests on review score are **rank-based**; scores are bimodal (57.8% five-star, 11.5% one-star), not central | M5 | F-11 |
 | Trend and cohort charts cover **2017-01 to 2018-08**; the window is stated on the chart, not footnoted | M4 | F-06 |

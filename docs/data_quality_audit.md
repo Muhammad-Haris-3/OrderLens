@@ -523,10 +523,36 @@ toward customers who waited). A `reviewed_before_delivery` flag is carried on
 - **M5** runs the headline test both with and without them. If the estimate
   moves materially, both numbers are published — a sensitivity analysis, not a
   choice between them.
-- **M6** excludes them from training. Their outcome is not caused by the
-  features being used to predict it.
+- ~~**M6** excludes them from training. Their outcome is not caused by the
+  features being used to predict it.~~ **Superseded — see below.**
 - **FR-12's limitations statement** records this explicitly. It is a structural
   limitation of the measurement instrument, not something cleaning can fix.
+
+> ### ⚠️ Amended by M4 — the M6 exclusion was wrong
+>
+> This audit measured *how many* pre-delivery reviews there are. It did not
+> measure *where they are*, and that turns out to be the whole question.
+>
+> M4 broke the share down by delay band
+> ([descriptive_findings.md](descriptive_findings.md)): **0.2% on every on-time
+> band, and 96–99% on every late one.** Whether a review was written before
+> delivery is very nearly determined by whether the delivery was late — the
+> survey fires on a fixed schedule after dispatch, so a parcel that has not
+> arrived by then is reviewed in its absence.
+>
+> `reviewed_before_delivery` is therefore a **post-treatment variable**, not a
+> nuisance to be filtered. Excluding it retains 99.8% of on-time orders and
+> 29.9% of late ones, and drops the measured gap from 2.020 to 0.572 — not by
+> removing bias but by selecting a well-behaved subset of late orders.
+>
+> **Revised:** M6 does **not** exclude these reviews from training; doing so
+> would remove 70% of late orders and most of the low scores the classifier
+> exists to predict. M5 keeps the with/without comparison but reports the
+> after-delivery figure as a **stated selection bound**, explicitly labelled as
+> conditioning on a post-treatment variable, never as an alternative estimate.
+>
+> The M2 decision was reasonable on the evidence M2 had. The evidence was
+> incomplete, and the milestone that found out is the one that fixed it.
 
 ## F-10 — Payments exceed item totals on 264 orders
 
