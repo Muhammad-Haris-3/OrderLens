@@ -101,11 +101,16 @@ def read_header(path: Path) -> tuple[str, ...]:
         return tuple(next(csv.reader(fh), []))
 
 
-def check_files() -> list[str]:
+def target_table(table: str, schema: str) -> str:
+    """Re-point a declared `raw.x` target at another schema."""
+    return f"{schema}.{table.split('.', 1)[1]}"
+
+
+def check_files(data_dir: Path = RAW_DIR) -> list[str]:
     """Verify every expected file exists with the expected header."""
     problems: list[str] = []
     for filename, (table, expected_header) in TABLES.items():
-        path = RAW_DIR / filename
+        path = data_dir / filename
         if not path.exists():
             problems.append(f"MISSING: {filename}")
             continue
@@ -138,14 +143,21 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true",
                         help="verify files only; do not touch the database")
+    # --data-dir and --schema exist so CI can load the committed sample fixture
+    # into a throwaway warehouse and run the dbt tests (NFR-3), and so that a
+    # sample load can never overwrite a real raw layer by accident.
+    parser.add_argument("--data-dir", type=Path, default=RAW_DIR,
+                        help=f"directory holding the nine CSVs (default: {RAW_DIR})")
+    parser.add_argument("--schema", default="raw",
+                        help="target schema (default: raw)")
     args = parser.parse_args()
 
-    problems = check_files()
+    problems = check_files(args.data_dir)
     if problems:
         print("Source file check FAILED:\n")
         for p in problems:
             print(f"  {p}")
-        print(f"\nExpected files in: {RAW_DIR}")
+        print(f"\nExpected files in: {args.data_dir}")
         print("See data/raw/README.md for how to obtain the dataset.")
         return 1
 
@@ -163,14 +175,16 @@ def main() -> int:
     try:
         with conn, conn.cursor() as cur:
             mismatches = []
-            for filename, (table, _) in TABLES.items():
-                path = RAW_DIR / filename
+            for filename, (declared, _) in TABLES.items():
+                table = target_table(declared, args.schema)
+                path = args.data_dir / filename
                 in_file, loaded = load_table(cur, path, table)
                 status = "OK" if in_file == loaded else "MISMATCH"
                 if in_file != loaded:
                     mismatches.append((table, in_file, loaded))
                 cur.execute(
-                    "INSERT INTO raw.load_log (table_name, source_file, rows_in_file, rows_loaded)"
+                    f"INSERT INTO {args.schema}.load_log"
+                    " (table_name, source_file, rows_in_file, rows_loaded)"
                     " VALUES (%s, %s, %s, %s)",
                     (table, filename, in_file, loaded),
                 )

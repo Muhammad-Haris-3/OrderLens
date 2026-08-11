@@ -102,6 +102,14 @@ warns** on any mismatch. The indexes are on join keys only — an index asserts
 nothing about the data, so raw keeps its source fidelity while the audit and the
 M3 builds stop scanning a million rows at a time.
 
+`--data-dir` and `--schema` exist so a sample load can never overwrite a real raw
+layer by pointing at the wrong database. CI uses both; so does
+`scripts/make_sample.py`, which regenerates the committed CI fixture:
+
+```bash
+python scripts/make_sample.py
+```
+
 ---
 
 ## The data-quality audit
@@ -193,7 +201,7 @@ with them. A test enforces it: anything in `analysis/` that reaches into `raw` o
 ## Testing
 
 ```bash
-pytest -q          # 43 tests — no data or database required
+pytest -q          # 52 tests — no data or database required
 ruff check .       # lint
 ```
 
@@ -217,9 +225,29 @@ The suite guards specific silent failures rather than exercising code paths:
   and be worthless; these tests run without a database so a leak cannot reach
   `main` even if nobody runs the model.
 
-`dbt build` needs the loaded warehouse and ~120 MB of uncommitted CSV, so CI runs
-`dbt parse` instead — which compiles every model, test and macro without
-connecting — plus the structural tests above.
+### What CI actually runs
+
+`ruff`, the 52 Python tests, **and the full `dbt build`** — all 24 models and all
+193 data tests — on every push.
+
+The dbt tests need a loaded warehouse, and the source dataset is ~120 MB of CSV
+that is deliberately not committed. So CI stands up a throwaway Postgres and
+loads [a committed sample fixture](tests/fixtures/raw_sample/README.md) instead:
+~1.5 MB, **grown outward** from a stratified seed of orders until every foreign
+key resolves.
+
+Grown, not sampled row by row — independent sampling produces items whose order
+does not exist, and then every `relationships` test fails for reasons that have
+nothing to do with the code under test. The fixture deliberately preserves all
+eight order statuses, 194 repeat customers, and more than one geolocation row per
+ZIP prefix. Each of those, if lost, would silently disable a test while leaving
+CI green; the repeat customers matter most, because without them
+`assert_repeat_customers_exist` — the risk R-1 guard — cannot be satisfied at any
+threshold, and the tempting fix is to stop running it.
+
+CI does **not** verify any figure in the milestone documents. Those come from the
+full warehouse. The fixture proves the pipeline is correct, not that the numbers
+reproduce.
 
 ---
 

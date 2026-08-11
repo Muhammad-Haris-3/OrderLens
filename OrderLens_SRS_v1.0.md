@@ -248,7 +248,7 @@ Requirements are analytical deliverables. Each is verifiable.
 |---|---|---|
 | **NFR-1** | Reproducibility | A clean clone must rebuild the entire warehouse from raw data with one documented command sequence |
 | **NFR-2** | Traceability | Every figure in any deliverable maps to a committed query or script |
-| **NFR-3** | Testability | CI runs dbt tests and Python tests on every push to `main` |
+| **NFR-3** | Testability | CI runs dbt tests and Python tests on every push to `main` — see §8.1 |
 | **NFR-4** | Performance | Full warehouse rebuild completes in under 10 minutes on free-tier Postgres |
 | **NFR-5** | Documentation | Every dbt model carries a description and column-level documentation |
 | **NFR-6** | Accessibility | Dashboard is colourblind-safe and does not encode meaning by colour alone |
@@ -257,6 +257,31 @@ Requirements are analytical deliverables. Each is verifiable.
 
 **NFR-8 is a requirement, not a platitude.** If delay proves not to drive
 satisfaction once controls are applied, that finding is the deliverable.
+
+### 8.1 How NFR-3 is satisfied
+
+The dbt data tests need a loaded warehouse, and the source dataset is ~120 MB of
+CSV that is deliberately not committed. Taken literally that made NFR-3
+unachievable, and for M3–M6 it was met only in the weaker sense that the tests
+ran locally while CI checked the project parsed.
+
+**That is no longer the case.** CI stands up a throwaway Postgres, loads a
+committed sample fixture, and runs `dbt build` — all 24 models and all 193 data
+tests, including the seven bespoke ones — alongside `ruff` and the 52 Python
+tests, on every push.
+
+The fixture (`tests/fixtures/raw_sample`, ~1.5 MB) is **grown outward** from a
+stratified seed of orders until every foreign key resolves, rather than sampled
+row by row, because independent sampling produces orphans and every
+`relationships` test then fails for reasons unrelated to the code under test. It
+deliberately preserves all eight order statuses, 194 repeat customers, and more
+than one geolocation row per ZIP prefix — each of which, if lost, would silently
+disable a test while leaving CI green.
+
+**What CI does not verify** is any figure in the milestone documents. Those come
+from the full warehouse; the fixture proves the pipeline is correct, not that the
+numbers are reproduced. Tests asserting absolute counts are parameterised
+(`min_repeat_customers`).
 
 ---
 

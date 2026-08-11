@@ -8,6 +8,40 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+
+    # A throwaway warehouse, so CI can run the dbt data tests and not merely
+    # check that the project parses (SRS NFR-3).
+    #
+    # The real dataset is ~120 MB of CSV and is deliberately not committed, so
+    # this loads the referentially-complete sample fixture in
+    # tests/fixtures/raw_sample instead — 1,550 orders grown outward from a
+    # stratified seed until every foreign key resolves. See scripts/make_sample.py
+    # for why it is grown rather than sampled row by row.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DBT_HOST: localhost
+      DBT_PORT: "5432"
+      DBT_USER: ci
+      DBT_PASSWORD: ci
+      DBT_DBNAME: ci
+      DBT_SCHEMA: analytics
+      DBT_SSLMODE: disable
+
     steps:
       - uses: actions/checkout@v4
 
@@ -21,33 +55,30 @@ jobs:
       - name: Lint
         run: ruff check .
 
-      - name: Tests
+      - name: Python tests
         run: pytest -q
+
+      - name: Create the raw schema
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/raw_schema.sql
+
+      - name: Load the sample fixture
+        run: python scripts/load_raw.py --data-dir tests/fixtures/raw_sample
+
+      - name: Index the raw layer
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f sql/raw_indexes.sql
 
       - name: Install dbt packages
         working-directory: dbt_orderlens
         run: dbt deps
 
-      # `dbt parse` compiles every model, test and macro — Jinja, refs, sources
-      # and the dependency graph — without connecting to a warehouse. The
-      # credentials below are placeholders that are never used; a profile simply
-      # has to exist for the project to load.
-      #
-      # This step used to end in `|| echo "::warning::"` because no models existed
-      # before M3. They exist now, so it fails properly: a broken ref or an
-      # unparseable model must not reach main.
-      - name: Validate dbt project parses
+      # Builds all 24 models and runs all 193 data tests, including the seven
+      # bespoke ones. min_repeat_customers is lowered because the fixture holds
+      # 194 repeat customers rather than the warehouse's 2,997 — the assertion
+      # still runs, and still catches the failure it exists for (dim_customers
+      # keyed on the per-order customer_id yields exactly zero).
+      # Block scalar, not a plain one: the --vars payload contains ": ", which
+      # YAML reads as a mapping indicator and rejects.
+      - name: dbt build
         working-directory: dbt_orderlens
-        env:
-          DBT_HOST: localhost
-          DBT_USER: ci
-          DBT_PASSWORD: ci
-          DBT_DBNAME: ci
-          DBT_SCHEMA: analytics
-          DBT_PORT: "5432"
-        run: dbt parse --profiles-dir . --project-dir .
-
-      # NOT run in CI: `dbt build`. It needs the loaded warehouse, and the dataset
-      # is ~120 MB of CSV that is not committed (see data/raw/README.md). The data
-      # tests run locally against Neon and their result is recorded in the
-      # milestone summary. What CI can enforce without data, it does.
+        run: |
+          dbt build --profiles-dir . --project-dir . --vars '{min_repeat_customers: 50}'

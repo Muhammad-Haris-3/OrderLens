@@ -11,7 +11,10 @@ sources:
       expectation turned out to be wrong, the test is gone and the measured
       number is recorded in its place — a test that fails on a known, permanent
       property of the source is one everybody learns to ignore.
-    schema: raw
+    # Defaults to `raw`. Overridable so CI can build against a throwaway schema
+    # loaded from the committed sample fixture (NFR-3), and so a sample load can
+    # never overwrite a real raw layer by pointing at the wrong place.
+    schema: "{{ env_var('DBT_RAW_SCHEMA', 'raw') }}"
 
     tables:
       - name: orders

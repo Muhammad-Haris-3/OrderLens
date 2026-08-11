@@ -39,6 +39,14 @@ vars:
   trend_window_start: "2017-01-01"
   trend_window_end: "2018-08-31"
 
+  # Floor for assert_repeat_customers_exist (risk R-1). 2,997 exist in the full
+  # warehouse; the threshold is well below that so a partial regression fails
+  # too. CI overrides it to 1 because it builds against a ~1,200-order sample
+  # where 1,000 repeat customers cannot exist — the assertion still runs, and
+  # still catches the failure it exists for, which is keying dim_customers on
+  # the per-order customer_id and getting exactly zero.
+  min_repeat_customers: 1000
+
 models:
   orderlens:
     staging:

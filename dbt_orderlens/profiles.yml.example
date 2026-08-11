@@ -13,6 +13,8 @@ orderlens:
       port: "{{ env_var('DBT_PORT') | int }}"
       dbname: "{{ env_var('DBT_DBNAME') }}"
       schema: "{{ env_var('DBT_SCHEMA') }}"
-      sslmode: require
+      # `require` for Neon; CI overrides to `disable` for its throwaway local
+      # Postgres, which has no certificate.
+      sslmode: "{{ env_var('DBT_SSLMODE', 'require') }}"
       threads: 4
       keepalives_idle: 0
