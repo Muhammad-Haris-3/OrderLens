@@ -12,7 +12,7 @@
 -- The threshold is 1,000 against the full warehouse, not 1: a partial regression
 -- that leaves a handful of repeats should fail too. M2 (A-19) measured 2,997.
 --
--- It is a var because CI builds against a ~1,200-order sample, where 1,000
+-- It is a var because CI builds against a 1,550-order sample, where 1,000
 -- repeat customers cannot exist. Lowering it there keeps the assertion running
 -- — the model must still produce repeat customers at all, which is what catches
 -- keying on customer_id — while the production threshold guards the real

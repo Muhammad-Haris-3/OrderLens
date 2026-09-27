@@ -270,7 +270,7 @@ def f1_threshold(y_true: np.ndarray, probability: np.ndarray) -> float:
     scores = []
     for t in grid:
         predicted = (probability >= t).astype(int)
-        tn, fp, fn, tp = confusion_matrix(y_true, predicted, labels=[0, 1]).ravel()
+        _, fp, fn, tp = confusion_matrix(y_true, predicted, labels=[0, 1]).ravel()
         precision = tp / (tp + fp) if tp + fp else 0.0
         recall = tp / (tp + fn) if tp + fn else 0.0
         scores.append(2 * precision * recall / (precision + recall)
@@ -483,7 +483,7 @@ def build_report(frame: pd.DataFrame) -> str:
     f1_choice = f1_threshold(y_test, probability)
 
     def row_for(threshold: float, label: str) -> tuple:
-        cost, tn, fp, fn, tp = expected_cost(
+        cost, _, fp, fn, tp = expected_cost(
             y_test, probability, threshold, COST_FALSE_POSITIVE, COST_FALSE_NEGATIVE
         )
         flagged = tp + fp
@@ -502,7 +502,7 @@ def build_report(frame: pd.DataFrame) -> str:
 
     sensitivity_rows = []
     for ratio in COST_RATIO_GRID:
-        t, cost = best_threshold(y_test, probability, 1.0, float(ratio))
+        t, _ = best_threshold(y_test, probability, 1.0, float(ratio))
         _, _, fp, fn, tp = expected_cost(y_test, probability, t, 1.0, float(ratio))
         sensitivity_rows.append((
             f"1 : {ratio}", t, tp + fp, tp / (tp + fn) if tp + fn else 0.0,
