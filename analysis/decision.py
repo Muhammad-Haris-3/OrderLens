@@ -65,9 +65,6 @@ CONTROLS = (
     "+ C(season) + C(purchase_year)"
 )
 
-# The dataset's full-coverage window is 2017-01 to 2018-08 (M2 F-06) — 20 months.
-COVERAGE_MONTHS = 20
-
 
 # ---------------------------------------------------------------------------
 # Loading
@@ -430,7 +427,7 @@ def section_currency(scored: pd.DataFrame, marginal: float,
     all_revenue_year = float(scored["order_value"].sum()) * scale
 
     rows = [
-        ("Orders scored", int(len(scored)), "the out-of-sample window"),
+        ("Orders scored", len(scored), "the out-of-sample window"),
         ("Months covered", round(months_tested, 1), ""),
         ("Breaches prevented (window)", prevented, ""),
         ("Breaches prevented (annualised)", round(prevented_year), ""),
